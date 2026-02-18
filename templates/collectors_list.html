@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Collector's List</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1 class="list_h1">Collector list</h1>
+<br>
+
+{% if collectors %}
+<br>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Collector ID Code</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Phone Number</th>
+            <th>Email</th>
+            <th>Work Status</th>
+            <th>Update</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for coll, work_status in collectors %}
+        <tr>
+            <td>{{ coll[1] }}</td>
+            <td>{{ coll[2] }}</td>
+            <td>{{ coll[3] }}</td>
+            <td>{{ coll[4] }}</td>
+            <td>{{ coll[5] }}</td>
+            <td>{{ work_status }}</td>
+            <td>
+                <form action="/admin/{{ admin_id }}/update_collector" method="POST">
+                    <input type="hidden" name="collector_id" value="{{ coll[1] }}">
+
+                    <select name="work_status">
+                        <option value="1" {% if coll[7] == 1 %}selected{% endif %}>At Work</option>
+                        <option value="0" {% if coll[7] == 0 %}selected{% endif %}>Not At Work</option>
+                    </select>
+
+                    <button type="submit">Update</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No collectors found.</p>
+{% endif %}
+
+<br>
+</body>
+</html>
+>

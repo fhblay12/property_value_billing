@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin home</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1 class="list_h1">Admin Home</h1>
+<br>
+<br>
+<div class="charts-box">
+    <h1>Dashboard</h1>
+    <br>
+  <div class="charts-row">
+    <div class="chart">
+      {{ pie_div | safe }}
+    </div>
+
+    <div class="chart">
+      {{ pie_div2 | safe }}
+    </div>
+
+      <div class="chart">
+      {{ chart_div | safe }}
+    </div>
+  </div>
+  <div class="dashboard-stats">
+      <p>Expected revenue: ${{ expected_revenue }}</p>
+      <p>Received revenue: ${{ received_revenue }}</p>
+      <p>Outstanding revenue: ${{ expected_revenue-received_revenue }}</p>
+    <p>Total number of properties registered today : {{ number_of_props }}</p>
+    <p>Total number of users registered today : {{ number_of_contacts }}</p>
+    <p>Total number of properties : {{ total_number_of_props }}</p>
+  </div>
+</div>
+
+
+  <script>
+    const ctx = document.getElementById('myChart').getContext('2d');
+
+    const myChart = new Chart(ctx, {
+      type: 'line', // bar, pie, doughnut, radar, etc.
+      data: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+        datasets: [{
+          label: 'Sales',
+          data: [12, 19, 3, 5, 2],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  </script>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+<div class="button-box">
+  <button onclick="loadProperty_list()">Property list</button>
+      <br>
+        <br>
+  <button onclick="loadContacts()">Load contacts</button>
+      <br>
+        <br>
+  <button onclick="loadProperty_map()">Property map</button>
+          <br>
+        <br>
+  <button onclick="loadCollector_list()">Collector List</button>
+</div>
+    <br>
+  <div class="iframe-container">
+    <iframe id="contentFrame"></iframe>
+  </div>
+
+<script>
+  function loadProperty_list() {
+    document.getElementById("contentFrame").src =
+      "/admin/{{ admin_id }}/property_list";
+  }
+
+  function loadContacts() {
+    document.getElementById("contentFrame").src =
+      "/admin/{{ admin_id }}/contact_list";
+  }
+
+  function loadProperty_map() {
+    document.getElementById("contentFrame").src =
+      "/admin/{{ admin_id }}/property_map";
+  }
+
+    function loadCollector_list() {
+    document.getElementById("contentFrame").src =
+      "/admin/{{ admin_id }}/collector_list";
+  }
+</script>
+</body>
+</html>

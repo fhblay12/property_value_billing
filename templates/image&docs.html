@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image and Documents</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Images and Documents</h1>
+    <form action="/image&docs/{{ property_id }}" method="POST" enctype="multipart/form-data">
+        <label>Images (minimum of two)</label>
+        <ul>
+            <li><input type="file" id="image1Upload" name="image1" accept="image/*" required></li>
+            <li><input type="file" id="image2Upload" name="image2" accept="image/*" required></li>
+            <li><input type="file" id="image3Upload" name="image3" accept="image/*"></li>
+            <li><input type="file" id="image4Upload" name="image4" accept="image/*"></li>
+        </ul>
+
+        <label>Documents (at least one)</label>
+        <ul>
+            <li><input type="file" id="document1Upload" name="document1" required></li>
+            <li><input type="file" id="document2Upload" name="document2"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ></li>
+            <li><input type="file" id="document3Upload" name="document3"></li>
+            <li><input type="file" id="document4Upload" name="document4"></li>
+        </ul>
+        <br>
+        <h4>Press this button after you submit images and documents and this will officially submit the property</h4>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>

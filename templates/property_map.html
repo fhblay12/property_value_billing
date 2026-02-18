@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Property Map</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Ensure the map div has visible height */
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+
+<script>
+window.initMap = function() {
+    // Initialize map
+    let map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 0, lng: 0 },
+        zoom: 2
+    });
+
+    const markers = [];
+    const bounds = new google.maps.LatLngBounds();
+
+    // Convert Python lists to JS arrays
+    const locations = {{ lat_long | tojson }};
+    const statuses = {{ paid_or_not | tojson }};
+    const property_ids = {{ property_ids | tojson }};
+
+    // Loop over the coordinates
+    for (let i = 0; i < locations.length; i++) {
+        let color = statuses[i] === 1 ? "green" : "red";
+        let iconUrl = color === "green"
+            ? "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+            : "http://maps.google.com/mapfiles/ms/icons/red-dot.png";
+
+        let marker = new google.maps.Marker({
+            position: { lat: locations[i][0], lng: locations[i][1] },
+            map: map,
+            icon: {
+                url: iconUrl,
+                scaledSize: new google.maps.Size(50, 50)  // bigger size
+            }
+        });
+
+        markers.push(marker);
+        bounds.extend(marker.getPosition());
+
+        // Create InfoWindow inside the loop for each marker
+        let info = new google.maps.InfoWindow({
+            content: `<div>
+                        <strong><a href="/admin/{{admin_id}}/property_view/${property_ids[i]}">Property Info</a></strong><br>
+                        Status: ${statuses[i] === 1 ? "Paid" : "Unpaid"}<br>
+                        Latitude: ${locations[i][0]}<br>
+                        Longitude: ${locations[i][1]}
+                      </div>`
+        });
+
+marker.addListener("click", function() {
+    info.open(map, marker);
+});
+
+    }
+
+    // Fit map to show all markers AFTER loop
+    if (markers.length > 0) {
+        map.fitBounds(bounds);
+    }
+}
+</script>
+
+
+
+
+<!-- Google Maps API -->
+<script async
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAZFnxQDWDycR5T4BFKJg3cNihau7rWIKM&callback=initMap">
+</script>
+
+</body>
+</html>
+

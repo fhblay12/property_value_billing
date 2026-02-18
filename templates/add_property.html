@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contact Information</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <h1>Add an additional property</h1>
+            <br>
+    <form method="post" action="/addproperty/{{ owner_id }}">
+        <ul>
+            <li>
+                <label>Property Category</label>
+                <select id="category" name="category">
+                <option value="1">Residential</option>
+                <option value="2">Commercial</option>
+    </select>
+            </li>
+
+            <li>
+                <label>Property Value</label>
+                <input type="number" step="any" name="property_value" required>
+            </li>
+            <br>
+                  <li>
+    <label>Select Property Location</label>
+    <div id="map" style="width: 25%; height: 400px;"></div>
+</li>
+            <br>
+            <li>
+                <label>Longitude</label>
+                <input type="number" step="any" id="longitude" name="longitude" required readonly>
+            </li>
+            <li>
+                <label>Latitude</label>
+                <input type="number" step="any" id="latitude" name="latitude" required readonly>
+            </li>
+            <li>
+                <label>City</label>
+                <input type="text" name="city" required>
+            </li>
+            <li>
+                <label>Digital address</label>
+                <input type="text" name="digital_address" required>
+            </li>
+            <li>
+                <label>Description</label>
+                <input type="text" name="description">
+            </li>
+            <br>
+            <br>
+
+        </ul>
+
+
+        <br>
+        <button type="submit">Submit</button>
+    </form>
+<script>
+let map;
+let marker;
+
+function initMap() {
+    const defaultLocation = { lat: 5.6037, lng: -0.1870 }; // Accra (change if needed)
+
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: defaultLocation,
+        zoom: 12,
+    });
+
+    marker = new google.maps.Marker({
+        position: defaultLocation,
+        map: map,
+        draggable: true,
+    });
+
+    // Set initial values
+    document.getElementById("latitude").value = defaultLocation.lat;
+    document.getElementById("longitude").value = defaultLocation.lng;
+
+    // Update inputs when marker is dragged
+    marker.addListener("dragend", function () {
+        const position = marker.getPosition();
+        document.getElementById("latitude").value = position.lat();
+        document.getElementById("longitude").value = position.lng();
+    });
+
+    // Update marker when map is clicked
+    map.addListener("click", function (event) {
+        marker.setPosition(event.latLng);
+        document.getElementById("latitude").value = event.latLng.lat();
+        document.getElementById("longitude").value = event.latLng.lng();
+    });
+}
+</script>
+
+<script async
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAZFnxQDWDycR5T4BFKJg3cNihau7rWIKM&callback=initMap">
+</script>
+
+</body>
+</html>

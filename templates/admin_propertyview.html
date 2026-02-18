@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Property View</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+
+
+{% if property_view %}
+    {% if billing %}
+
+<div class="layout">
+
+  <div class="property-info">
+    <h1>{{ property_view[6] }}</h1>
+    <br>
+    <br>
+
+    <table border="1">
+      <thead>
+        <tr>
+
+          <th>Property Value</th>
+          <th>City</th>
+          <th>Digital Address</th>
+          <th>Latitude</th>
+          <th>Longitude</th>
+          <th>Registration Date</th>
+            <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+
+          <td>{{ property_view[2] }}</td>
+          <td>{{ property_view[7] }}</td>
+          <td>{{ property_view[6] }}</td>
+          <td>{{ property_view[4] }}</td>
+          <td>{{ property_view[5] }}</td>
+          <td>{{ property_view[9] }}</td>
+            <td>{{ property_view[8] }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <br>
+    <br>
+    <br>
+      <div id="bg">
+      <h1>Billing Info</h1>
+          <br>
+          <br>
+      <p>This property has a monthly bill of ${{ billing[1] }} due on {{ billing[5] }}.</p>
+    {% else %}
+      <h4>No billing information available.</h4>
+    {% endif %}
+      </div>
+  </div>
+
+  <div id="map-view"></div>
+
+</div>
+
+
+<script>
+  function initMap() {
+    const location = {
+      lat: Number("{{ property_view[5] }}"),
+      lng: Number("{{ property_view[4] }}")
+    };
+
+    const map = new google.maps.Map(document.getElementById("map-view"), {
+      zoom: 14,
+      center: location
+    });
+
+    new google.maps.Marker({
+      position: location,
+      map: map
+    });
+  }
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAZFnxQDWDycR5T4BFKJg3cNihau7rWIKM&callback=initMap">
+</script>
+
+{% else %}
+<p>No properties found.</p>
+{% endif %}
+
+
+</body>
+</html>

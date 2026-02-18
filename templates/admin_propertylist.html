@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Property List</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>Property List</h1>
+<br>
+<form method="get">
+  <input
+    type="search"
+    name="q"
+    placeholder="Search by ID, city, digital address"
+    value="{{ q or '' }}"
+  >
+
+
+
+
+    <input
+    type="search"
+    name="city"
+    placeholder="Search by city"
+    value="{{ city or '' }}"
+  >
+
+
+
+
+
+  <select name="category">
+    <option value="">All</option>
+    <option value="1">residential</option>
+    <option value="2">commercial</option>
+
+  </select>
+
+
+
+
+  <select name="has_been_paid">
+    <option value="">All</option>
+    <option value="1">Paid</option>
+    <option value="0">Not paid</option>
+
+  </select>
+
+    <button type="submit">Search</button>
+</form>
+<br>
+{% if combined %}
+<table border="1">
+    <thead>
+        <tr>
+            <th>Digital address</th>
+            <th>City</th>
+            <th>Registration Date</th>
+            <th>Category</th>
+            <th>has been paid this month</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for prop, category, paid_or_not in combined %}
+<tr>
+    <td><a href="/admin/{{ admin_id }}/property_view/{{ prop[0] }}">{{ prop[6] }}</a></td>
+    <td>{{ prop[7] }}</td>
+    <td>{{ prop[9] }}</td>
+    <td>{{ category }}</td>
+    <td>{{ paid_or_not }}</td>
+</tr>
+{% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No properties found.</p>
+{% endif %}
+<br>
+<a href="/admin/{{ admin_id }}/export-csv?q={{ request.query_params.q }}&city={{ request.query_params.city }}&category={{ request.query_params.category }}&has_been_paid={{ request.query_params.has_been_paid }}">
+    Download CSV
+</a>
+
+</body>
+</html>

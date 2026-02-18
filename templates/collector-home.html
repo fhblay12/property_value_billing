@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nearby Properties Map & Table</title>
+    <link rel="stylesheet" href="/static/style.css">
+        <style>
+        /* Ensure the map div has visible height */
+        #map {
+            width: 80%;
+            height: 500px;
+            border-radius: 8px;
+            margin: 0 auto;
+        }
+
+        #property-table-container {
+            width: 80%;
+            border-radius: 8px;
+            margin: 0 auto;
+        }    </style>
+</head>
+<body>
+
+<h1 class="list_h1">Collector Home Page</h1>
+<br>
+<div class="button-box-collector">
+<button onclick="startTracking()">Start Tracking</button>
+<button onclick="stopTracking()">Stop Tracking</button>
+</div>
+<br>
+<p id="status" style="margin-left:20px">Status: Not tracking</p>
+<div id="map"></div>
+<br>
+<br>
+<br>
+
+<div id="property-table-container" style="border:1px solid #ccc;"></div>
+<br>
+<br>
+
+<script>
+let map;
+let watchId = null;
+let userMarker = null;
+let propertyMarkers = [];
+let mapLoaded = false;
+let propertiesLoaded = false;
+let currentUserLatLng = null;
+let loadedProperties = [];
+
+const PAY_DISTANCE_THRESHOLD = 50; // meters
+
+// Load Google Maps (modern way)
+function loadGoogleMaps() {
+    return new Promise((resolve) => {
+        if (mapLoaded) {
+            resolve();
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyAZFnxQDWDycR5T4BFKJg3cNihau7rWIKM&libraries=geometry";
+        script.async = true;
+        script.defer = true;
+
+        script.onload = () => {
+            mapLoaded = true;
+            resolve();
+        };
+
+        document.head.appendChild(script);
+    });
+}
+
+// Initialize map
+function initializeMap(lat, lng) {
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: lat, lng: lng },
+        zoom: 15
+    });
+}
+
+// Load property markers with directions link
+function loadMarkers(properties) {
+
+    propertyMarkers.forEach(m => m.setMap(null));
+    propertyMarkers = [];
+
+    properties.forEach(p => {
+
+        const position = new google.maps.LatLng(p.latitude, p.longitude);
+
+        const iconUrl = p.has_been_paid === 1
+            ? "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+            : "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
+
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            icon: iconUrl
+        });
+
+        const infoWindow = new google.maps.InfoWindow();
+
+        marker.addListener("click", () => {
+
+            let directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
+
+            if (currentUserLatLng) {
+                directionsUrl =
+                    `https://www.google.com/maps/dir/?api=1&origin=${currentUserLatLng.lat()},${currentUserLatLng.lng()}&destination=${p.latitude},${p.longitude}`;
+            }
+
+            infoWindow.setContent(`
+                <div style="font-family: Arial; min-width: 200px;">
+                    <strong>Digital Address:</strong> ${p.digital_address}<br>
+                    <strong>Owner:</strong> ${p.first_name} ${p.last_name}<br>
+                    <strong>Status:</strong> ${p.has_been_paid === 1 ? 'Paid' : 'Unpaid'}<br><br>
+                    <a href="${directionsUrl}" target="_blank">
+                        🧭 Get Directions
+                    </a>
+                </div>
+            `);
+
+            infoWindow.open(map, marker);
+        });
+
+        propertyMarkers.push(marker);
+    });
+}
+
+// Generate property table
+function generatePropertyTable(properties) {
+
+    let html = `
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Digital Address</th>
+            <th>Owner</th>
+            <th>Status</th>
+            <th>Distance (m)</th>
+            <th>Action</th>
+        </tr>`;
+
+    properties.forEach(p => {
+
+        const propertyLatLng = new google.maps.LatLng(p.latitude, p.longitude);
+
+        let distance = null;
+        let showPayButton = false;
+
+        if (currentUserLatLng) {
+            distance = google.maps.geometry.spherical.computeDistanceBetween(
+                currentUserLatLng,
+                propertyLatLng
+            );
+
+            if (distance <= PAY_DISTANCE_THRESHOLD) {
+                showPayButton = true;
+            }
+        }
+
+        html += `
+        <tr>
+            <td>${p.id}</td>
+            <td><a href="https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}" target="_blank">${p.digital_address}</a></td>
+            <td>${p.first_name} ${p.last_name}</td>
+            <td>${p.has_been_paid === 1 ? 'Paid' : 'Unpaid'}</td>
+            <td>${distance ? distance.toFixed(1) : '--'}</td>
+            <td>
+                ${
+                    showPayButton
+                    ? `<a href="/pay/${p.id}">
+                         <button type="button">Pay Bill</button>
+                       </a>`
+                    : `<span style="color:gray;">Too far</span>`
+                }
+            </td>
+        </tr>`;
+    });
+
+    html += `</table>`;
+
+    document.getElementById("property-table-container").innerHTML = html;
+}
+
+// Start tracking
+async function startTracking() {
+
+    if (!navigator.geolocation) {
+        alert("Geolocation not supported");
+        return;
+    }
+
+    document.getElementById("map").style.display = "block";
+    document.getElementById("status").innerHTML = "Loading map...";
+
+    await loadGoogleMaps();
+
+    watchId = navigator.geolocation.watchPosition(
+
+        async (position) => {
+
+            const { latitude, longitude } = position.coords;
+            const userLatLng = new google.maps.LatLng(latitude, longitude);
+            currentUserLatLng = userLatLng;
+
+            document.getElementById("status").innerHTML = "Tracking...";
+
+            if (!map) {
+                initializeMap(latitude, longitude);
+
+                userMarker = new google.maps.Marker({
+                    position: userLatLng,
+                    map: map,
+                    icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                });
+
+            } else {
+                userMarker.setPosition(userLatLng);
+            }
+
+            map.panTo(userLatLng);
+
+            if (!propertiesLoaded) {
+                propertiesLoaded = true;
+
+                try {
+                    const res = await fetch(`/api/nearby-properties?lat=${latitude}&lng=${longitude}`);
+                    loadedProperties = await res.json();
+
+                    loadMarkers(loadedProperties);
+                    generatePropertyTable(loadedProperties);
+
+                } catch(err) {
+                    console.error("Error fetching properties:", err);
+                }
+            } else {
+                generatePropertyTable(loadedProperties);
+            }
+        },
+
+        (error) => {
+            document.getElementById("status").innerHTML = "Location error.";
+            console.error(error);
+        },
+
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
+}
+
+// Stop tracking
+function stopTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        propertiesLoaded = false;
+        document.getElementById("status").innerHTML = "Tracking stopped.";
+    }
+}
+</script>
+
+</body>
+</html>

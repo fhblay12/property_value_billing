@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contact List</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>Contact List</h1>
+
+{% if contacts %}
+<form method="get"  action="/admin/{{ admin_id }}/contact_list">
+  <input
+    type="search"
+    name="q"
+    placeholder="Search by name, phone number"
+    value="{{ q or '' }}"
+  >
+    <button type="submit">Submit</button>
+</form>
+<br>
+<table border="1">
+    <thead>
+        <tr>
+            <th>First name</th>
+            <th>Last name</th>
+            <th>Phone number</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for contact in contacts %}
+        <tr>
+            <td><a href="/admin/{{admin_id}}/contact_view/{{contact[0]}}">{{ contact[1] }}</a></td>
+            <td>{{ contact[2] }}</td>
+            <td>{{ contact[3] }}</td>
+
+
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No contacts found.</p>
+{% endif %}
+<br>
+<br>
+
+
+
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Property View</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+
+
+{% if contact_view %}
+
+
+<div class="layout">
+
+  <div class="property-info">
+    <h1>Contact Details and Properties</h1>
+    <br>
+    <br>
+
+    <table border="1">
+      <thead>
+        <tr>
+          <th>First name</th>
+          <th>Last name</th>
+          <th>Phone number</th>
+          <th>Email</th>
+          <th>Registration Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{ contact_view[1] }}</td>
+          <td>{{ contact_view[2] }}</td>
+          <td>{{ contact_view[3] }}</td>
+          <td>{{ contact_view[4] }}</td>
+          <td>{{ contact_view[5] }}</td>
+
+
+        </tr>
+      </tbody>
+    </table>
+</div>
+
+</div>
+
+
+{% else %}
+<p>No contacts found.</p>
+{% endif %}
+<br>
+<br>
+<br>
+<h2> Properties </h2>
+<br>
+{% if properties_of_contact %}
+    {% for prop in properties_of_contact%}
+    <table border="1">
+      <thead>
+        <tr>
+          <th>Digital address</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+              <a href="/admin/{{admin_id}}/property_view/{{prop[0]}}">{{ prop[6] }}</a></td>
+        </tr>
+      </tbody>
+    </table>
+    {% endfor %}
+{% else %}
+    <p>No properties</p>
+{% endif %}
+</body>
+</html>

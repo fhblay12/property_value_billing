@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Property List</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1 class="list_h1">Property List</h1>
+<br>
+<form method="get">
+  <input
+    type="search"
+    name="q"
+    placeholder="Search by digital address"
+    value="{{ q or '' }}"
+  >
+
+
+
+
+    <input
+    type="search"
+    name="city"
+    placeholder="Search by city"
+    value="{{ city or '' }}"
+  >
+
+
+
+
+
+  <select name="category">
+    <option value="1">residential</option>
+    <option value="2">commercial</option>
+  </select>
+
+
+
+
+  <select name="has_been_paid">
+    <option value="1">Paid</option>
+    <option value="0">Not paid</option>
+  </select>
+    <br>
+<br>
+    <button type="submit">Search</button>
+</form>
+<br>
+{% if combined %}
+<br>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Address</th>
+            <th>City</th>
+            <th>Monthly Bill</th>
+            <th>Billing Date</th>
+            <th>Category</th>
+            <th>Has Been Paid This Month</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for prop, category, has_been_paid in combined %}
+        <tr>
+            <td>{{ prop[2] }}</td>
+            <td>{{ prop[3] }}</td>
+            <td>{{ prop[4] }}</td>
+            <td>{{ prop[5] }}</td>
+            <td>{{ category }}</td>
+            <td>{{ has_been_paid }}</td>
+            <td>
+                <a href="/pay/{{prop[0]}}">
+            <button type="button">Pay bill</button>
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No properties found.</p>
+{% endif %}
+<br>
+                <a href="/addproperty/{{owner_id}}">
+            <button type="button">Add property</button>
+                </a>
+</body>
+</html>

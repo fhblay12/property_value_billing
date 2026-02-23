@@ -3,7 +3,7 @@ import io
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Database import Database
-
+from services.property_service import Property_service
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -629,61 +629,9 @@ async def submit_form(
     first_name = first_name.title()
     last_name = last_name.title()
     city = city.title()
-    created_time=datetime.now()
-    sql = """
-       INSERT INTO contacts
-       (first_name, last_name, phone_number, email, created_datetime, updated_datetime, password)
-       VALUES (%s, %s, %s, %s, %s, %s, %s)
-       """
-
-    values = (
-        first_name,
-        last_name,
-        phone_number,
-        email,
-        created_time,
-        created_time,
-        password
-    )
-    row=db.execute(sql, values)
-    owner_id = row.lastrowid
-    sql2 = """
-       INSERT INTO properties
-       (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
-       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-       """
-    values2 = (
-       owner_id,
-       category,
-       property_value,
-       longitude,
-       latitude,
-       city,
-       digital_address,
-       description,
-       created_time
-    )
-
-    row=db.execute(sql2, values2)
-
-    property_id = row.lastrowid
-#--------------------------------MONTHLY BILL---------------------------------------------------------------------------#
-    monthly_bill=property_value*BILLING_MULTIPlIER
-    one_month_later = created_time + relativedelta(months=1)
-    sql3 = """
-            INSERT INTO billing
-            (property_id, monthly_bill, created_datetime, billing_date)
-            
-            VALUES (%s, %s, %s, %s)
-    """
-
-    values3 = (
-        property_id,
-        monthly_bill,
-        created_time,
-        one_month_later
-    )
-    db.execute(sql3,values3)
+    owner_id=Property_service.create_contact(first_name, last_name, phone_number, email, password)
+    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
+    Property_service.create_monthly_bill(property_id, property_value)
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET

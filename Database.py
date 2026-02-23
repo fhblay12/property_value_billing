@@ -17,6 +17,8 @@ class Database:
             result = cursor.fetchone()
         elif fetchall:
             result = cursor.fetchall()
+        else:
+            result = cursor.lastrowid
 
         self.conn.commit()
         cursor.close()

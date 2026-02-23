@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-
+from Database import Database
 
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
@@ -27,11 +27,11 @@ def generate_qr_with_token(collector_code, expire_minutes=60):
     expiration = datetime.now() + timedelta(minutes=expire_minutes)
 
     # Save token and expiration in database
-    cursor.execute(
+    db.execute(
         "UPDATE collectors SET qr_token = %s, qr_token_expiration = %s WHERE collector_id_code = %s",
         (token, expiration, collector_code)
     )
-    conn.commit()
+
 
     # Generate URL QR code
     url = f"http://127.0.0.1:8000/scan/{token}"
@@ -46,13 +46,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 #--------------------------------------MYSQL Database connection--------------------------------------------------------------#
-conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="6172BBbb!",
-    database="property_value_billing"
-)
-cursor = conn.cursor(buffered=True)
+db = Database()
 
 from fastapi.responses import PlainTextResponse
 import traceback
@@ -111,15 +105,15 @@ def submit_form(
     password: str = Form(...)
 ):
     # Try owner login
-    cursor.execute(
+    row=db.execute(
         """
         SELECT owner_id
         FROM contacts
         WHERE email = %s AND password = %s
         """,
-        (last_name, password)
+        (last_name, password), True
     )
-    row = cursor.fetchone()
+
 
     if row:
         owner_id = row[0]
@@ -129,15 +123,15 @@ def submit_form(
         )
 
     # Try admin login
-    cursor.execute(
+    row=db.execute(
         """
         SELECT admin_login_id
         FROM admin_login
         WHERE admin_username = %s AND admin_password = %s
         """,
-        (last_name, password)
+        (last_name, password), True
     )
-    row = cursor.fetchone()
+
 
     if row:
         admin_id = row[0]
@@ -147,15 +141,15 @@ def submit_form(
         )
 
     # Try admin login
-    cursor.execute(
+    row=db.execute(
         """
         SELECT collector_id_code
         FROM collectors
         WHERE collector_id_code = %s AND collector_password = %s AND at_work = 1
         """,
-        (last_name, password)
+        (last_name, password), True
     )
-    row = cursor.fetchone()
+
 
     if row:
         collector_id = row[0]
@@ -175,11 +169,10 @@ def submit_form(
 #---------------------------------ADMIN HOME------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
 async def admin_login(request: Request, admin_id: int):
-    cursor = conn.cursor()
+
 
     # Fetch category counts
-    cursor.execute("SELECT category_id, COUNT(*) FROM properties GROUP BY category_id")
-    data = cursor.fetchall()
+    data=db.execute("SELECT category_id, COUNT(*) FROM properties GROUP BY category_id", fetchall=True)
 
 
     labels=["Residential", "Commercial"]
@@ -202,8 +195,9 @@ async def admin_login(request: Request, admin_id: int):
         font=dict(color="#000000"),
     )
 
-    cursor.execute("SELECT city, COUNT(*) FROM properties GROUP BY city")
-    data = cursor.fetchall()
+    data=db.execute("SELECT city, COUNT(*) FROM properties GROUP BY city", fetchall=True)
+
+
 
 
     cities = [row[0] for row in data]
@@ -228,64 +222,62 @@ async def admin_login(request: Request, admin_id: int):
     # Convert Plotly figure to HTML div
     pie_div = pio.to_html(fig, full_html=False)
     pie_div2 = pio.to_html(fig2, full_html=False)
-    cursor.execute(
+    count_of_props=db.execute(
     """SELECT COUNT(*)
     FROM
     properties
     WHERE
-    created_datetime = CURDATE()"""
-    )
-    number_of_props=str(cursor.fetchall()[0][0])
+    created_datetime = CURDATE()""", fetchall=True
+    )[0][0]
+    number_of_props=str(count_of_props)
 
-    cursor.execute(
+    count_of_contacts=db.execute(
     """SELECT COUNT(*)
     FROM
     contacts
     WHERE
-    created_datetime = CURDATE()"""
-    )
-    number_of_contacts=str(cursor.fetchall()[0][0])
+    created_datetime = CURDATE()""", fetchall=True
+    )[0][0]
+    number_of_contacts=str(count_of_contacts)
 
-    cursor.execute(
+    count_of_total_props=db.execute(
     """SELECT COUNT(*)
     FROM
     properties
-    """
-    )
-    total_number_of_props=str(cursor.fetchall()[0][0])
+    """, fetchall=True
+    )[0][0]
+    total_number_of_props=str(count_of_total_props)
     print(number_of_props)
 
-    cursor.execute(
+    total_exp_revenue=db.execute(
         """SELECT SUM(monthly_bill) AS total
             FROM billing
-        """
-    )
-    expected_revenue = int(cursor.fetchall()[0][0])
+        """, fetchall=True
+    )[0][0]
+    expected_revenue = int(total_exp_revenue)
     print(expected_revenue)
-    cursor.execute(
+    total_rec_revenue=db.execute(
         """SELECT SUM(monthly_bill) AS total
             FROM billing
             WHERE has_been_paid = 1
-        """
-    )
-    received_revenue = int(cursor.fetchall()[0][0])
+        """, fetchall=True
+    )[0][0]
+    received_revenue = int(total_rec_revenue)
     print(expected_revenue)
 
-    cursor.execute("""
+    rows=db.execute("""
         SELECT payment_date, SUM(monthly_bill) AS total_revenue
         FROM billing
         WHERE has_been_paid = 1
         GROUP BY payment_date
         ORDER BY payment_date
-    """)
+    """, fetchall=True)
 
     # Fetch and convert dates
-    rows = cursor.fetchall()
     print(rows)
     date_strings = [row[0].date().isoformat() for row in rows]
     revenue = [row[1] for row in rows]
 
-    cursor.close()
 
     # Create Plotly line chart
     fig3 = go.Figure()
@@ -341,7 +333,7 @@ async def admin_property_list(
     category: str | None = Query(None),
     has_been_paid: str | None = Query(None),
 ):
-    cursor = conn.cursor(buffered=True)
+
 
     base_query = """
         SELECT p.*, b.has_been_paid
@@ -356,9 +348,8 @@ async def admin_property_list(
     if conditions:
         base_query += " AND " + " AND ".join(conditions)
 
-    cursor.execute(base_query, tuple(params))
-    rows = cursor.fetchall()
-    cursor.close()
+    rows=db.execute(base_query, tuple(params), fetchall=True)
+
 
     # Map category_id to human-readable
     categories = ["residential" if row[1] == 1 else "commercial" for row in rows]
@@ -380,7 +371,7 @@ def export_properties_csv(
     category: str | None = None,
     has_been_paid: str | None = None
 ):
-    cur = conn.cursor(buffered=True)
+
 
     base_query = """
         SELECT p.property_id, p.digital_address, p.city,
@@ -396,9 +387,7 @@ def export_properties_csv(
     if conditions:
         base_query += " AND " + " AND ".join(conditions)
 
-    cur.execute(base_query, tuple(params))
-    rows = cur.fetchall()
-    cur.close()
+    rows=db.execute(base_query, tuple(params), fetchall=True)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -422,20 +411,21 @@ def export_properties_csv(
 async def contact_list(request: Request, admin_id: int, q: str | None = Query(None)):
     if q:
         search = f"%{q}%"
-        cursor.execute("""
+        row=db.execute("""
                 SELECT * FROM contacts WHERE  (
                       first_name LIKE %s
                       OR last_name LIKE %s
                       OR phone_number LIKE %s
 
                     ) 
-        """, (search, search, search)
+        """, (search, search, search), fetchall=True
                        )
     else:
-        cursor.execute("""
+        row=db.execute("""
             SELECT * FROM CONTACTS
-        """)
-    contacts=cursor.fetchall()
+        """, fetchall=True)
+    contacts=row
+    print(contacts)
     return templates.TemplateResponse(
         "contact_list.html",
         {
@@ -448,16 +438,15 @@ async def contact_list(request: Request, admin_id: int, q: str | None = Query(No
 @app.get("/admin/{admin_id}/property_view/{property_id}", response_class=HTMLResponse)
 async def admin_property_view(request: Request, admin_id: int, property_id: int):
 
-    cursor.execute(
+    property_view=db.execute(
         """
         SELECT
             *
         FROM properties
         WHERE property_id = %s 
         """,
-        (property_id,)
+        (property_id,), fetchone=True
     )
-    property_view = cursor.fetchone()
     if property_view:
         property_view = list(property_view)
         if isinstance(property_view[8], (bytes, bytearray)):
@@ -465,16 +454,15 @@ async def admin_property_view(request: Request, admin_id: int, property_id: int)
         property_view = tuple(property_view)
 
     print(property_view)
-    cursor.execute(
+    billing=db.execute(
         """
         SELECT
             *
         FROM billing
         WHERE property_id = %s 
         """,
-        (property_id,)
+        (property_id,), fetchone=True
     )
-    billing = cursor.fetchone()
     return templates.TemplateResponse(
         "admin_propertyview.html",
         {
@@ -490,22 +478,21 @@ async def admin_property_view(request: Request, admin_id: int, property_id: int)
 @app.get("/admin/{admin_id}/contact_view/{owner_id}", response_class=HTMLResponse)
 async def admin_property_view(request: Request, admin_id: int, owner_id: int):
 
-    cursor.execute(
+    contact_view=db.execute(
         """
         SELECT
             *
         FROM contacts
         WHERE owner_id = %s 
         """,
-        (owner_id,)
+        (owner_id,), fetchone=True
     )
-    contact_view = cursor.fetchone()
 
-    cursor.execute("""
+
+    properties_of_contact=db.execute("""
                 SELECT * FROM properties
                 WHERE owner_id = %s
-            """, (owner_id,))
-    properties_of_contact = cursor.fetchall()
+            """, (owner_id,), fetchall=True)
     return templates.TemplateResponse(
         "admin_contactview.html",
         {
@@ -527,7 +514,6 @@ async def show_property_list(
     category: str | None = Query(None),
     has_been_paid: str | None = Query(None)
 ):
-    cur = conn.cursor(buffered=True)
     base_query = """
         SELECT
             p.property_id,
@@ -575,8 +561,7 @@ async def show_property_list(
     # print(base_query)
     # print(params)
 
-    cur.execute(base_query, tuple(params))
-    property_list = cur.fetchall()
+    property_list=db.execute(base_query, tuple(params), False , True)
     print(property_list)
     category_id = [property[1] for property in property_list]
     has_been_paid = [property[6] for property in property_list]
@@ -590,7 +575,6 @@ async def show_property_list(
     combined = zip(property_list, categories, paid_or_not)
     #print(categories)
     print(has_been_paid)
-    cur.close()
 
     return templates.TemplateResponse(
         "property_list.html",
@@ -604,15 +588,14 @@ async def show_property_list(
 
 @app.post("/propertylist/{owner_id}")
 async def submit_form(owner_id: int):
-    cursor.execute(
+    property_id=db.execute(
         """
         SELECT property_id FROM properties
         WHERE owner_id = %s
         """,
-        (owner_id, )
+        (owner_id, ), fetchall=True
     )
 
-    property_id = cursor.fetchone()
 
 
     return RedirectResponse(
@@ -662,9 +645,8 @@ async def submit_form(
         created_time,
         password
     )
-    cursor.execute(sql, values)
-    conn.commit()
-    owner_id = cursor.lastrowid
+    row=db.execute(sql, values)
+    owner_id = row.lastrowid
     sql2 = """
        INSERT INTO properties
        (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
@@ -682,9 +664,9 @@ async def submit_form(
        created_time
     )
 
-    cursor.execute(sql2, values2)
-    conn.commit()
-    property_id = cursor.lastrowid
+    row=db.execute(sql2, values2)
+
+    property_id = row.lastrowid
 #--------------------------------MONTHLY BILL---------------------------------------------------------------------------#
     monthly_bill=property_value*BILLING_MULTIPlIER
     one_month_later = created_time + relativedelta(months=1)
@@ -701,8 +683,7 @@ async def submit_form(
         created_time,
         one_month_later
     )
-    cursor.execute(sql3,values3)
-    conn.commit()
+    db.execute(sql3,values3)
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET
@@ -759,8 +740,7 @@ async def submit_form(
         VALUES (%s, %s, %s, %s, %s)
     """
 
-    cursor.executemany(sql, files_to_insert)
-    conn.commit()
+    db.executemany(sql, files_to_insert)
 
     return RedirectResponse(
         url="/",
@@ -806,9 +786,8 @@ async def submit_form(
         created_time
     )
 
-    cursor.execute(sql2, values2)
-    conn.commit()
-    property_id = cursor.lastrowid
+    row=db.execute(sql2, values2)
+    property_id = row.lastrowid
     # --------------------------------MONTHLY BILL---------------------------------------------------------------------------#
     monthly_bill = property_value * BILLING_MULTIPlIER
     one_month_later = created_time + relativedelta(months=1)
@@ -825,8 +804,8 @@ async def submit_form(
         created_time,
         one_month_later
     )
-    cursor.execute(sql3, values3)
-    conn.commit()
+    db.execute(sql3, values3)
+
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET
@@ -836,7 +815,7 @@ async def submit_form(
 #--------------------------------PAY------------------------------------------------------------------------------#
 @app.get("/pay/{property_id}", response_class=HTMLResponse)
 async def show_form(request: Request, property_id: int):
-    cursor.execute(
+    db.execute(
         """
         UPDATE billing
         SET has_been_paid = %s
@@ -845,7 +824,7 @@ async def show_form(request: Request, property_id: int):
         (1, property_id)
     )
     created_time = datetime.now()
-    cursor.execute(
+    db.execute(
         """
         UPDATE billing
         SET payment_date = %s
@@ -853,7 +832,7 @@ async def show_form(request: Request, property_id: int):
         """,
         (created_time, property_id)
     )
-    conn.commit()
+
     return templates.TemplateResponse(
         "pay.html",
         {"request": request,
@@ -868,8 +847,7 @@ async def submit_form(request: Request, admin_id: int):
         SELECT latitude, longitude FROM properties
     """
 
-    cursor.execute(sql)
-    lat_long=cursor.fetchall()
+    lat_long=db.execute(sql, fetchall=True)
     lat_long_floats = [(float(lat), float(lng)) for lat, lng in lat_long]
     print(lat_long_floats)
 
@@ -879,16 +857,16 @@ async def submit_form(request: Request, admin_id: int):
         JOIN properties p ON p.property_id = b.property_id
     """
 
-    cursor.execute(sql)
-    paid_or_not=cursor.fetchall()
+    paid_or_not=db.execute(sql, fetchall=True)
     paid_or_not=[item[0] for item in paid_or_not]
     print(paid_or_not)
 
     sql = """
-        SELECT property_id FROM properties
+            SELECT property_id 
+            FROM properties
+            ORDER BY property_id
     """
-    cursor.execute(sql)
-    property_ids=[item[0] for item in cursor.fetchall()]
+    property_ids=[item[0] for item in db.execute(sql, fetchall=True)]
     print(property_ids)
     return templates.TemplateResponse(
         "property_map.html",
@@ -935,8 +913,7 @@ WHERE ST_Distance_Sphere(
 ) <= 5000
 AND b.has_been_paid =0
     """
-    cursor.execute(sql, (lng, lat))  # ⚠️ Order matters: POINT(lng, lat)
-    rows = cursor.fetchall()
+    rows=db.execute(sql, (lng, lat), fetchall=True)  # ⚠️ Order matters: POINT(lng, lat)
     properties = []
     for row in rows:
         properties.append({
@@ -958,8 +935,7 @@ AND b.has_been_paid =0
 @app.get("/admin/{admin_id}/collector_list", response_class=HTMLResponse)
 async def admin_login(request: Request, admin_id: int):
     # Fetch category counts
-    cursor.execute("SELECT * FROM collectors")
-    collectors = cursor.fetchall()
+    collectors = db.execute("SELECT * FROM collectors", fetchall=True)
     work_status = ["not at work" if item[7] == 0 else "at work" for item in collectors]
     id_codes=[item[1] for item in collectors]
     for code in id_codes:
@@ -982,11 +958,10 @@ async def update_collector(
     collector_id: str = Form(...),
     work_status: int = Form(...)
 ):
-    cursor.execute(
+    db.execute(
         "UPDATE collectors SET at_work = %s WHERE collector_id_code = %s",
         (work_status, collector_id)
     )
-    conn.commit()
 
     return RedirectResponse(
         url=f"/admin/{admin_id}/collector_list",
@@ -996,11 +971,10 @@ async def update_collector(
 @app.get("/scan/{token}", response_class=HTMLResponse)
 async def scan_collector(token: str):
     # Look up collector by token
-    cursor.execute(
+    result=db.execute(
         "SELECT collector_id_code, qr_token_expiration FROM collectors WHERE qr_token = %s",
-        (token,)
+        (token,),fetchone=True
     )
-    result = cursor.fetchone()
 
     if not result:
         return HTMLResponse("<h2>Invalid QR Code</h2>", status_code=400)
@@ -1013,18 +987,18 @@ async def scan_collector(token: str):
         return HTMLResponse("<h2>QR Code Expired</h2>", status_code=400)
 
     # Mark as at work
-    cursor.execute(
+    db.execute(
         "UPDATE collectors SET at_work = %s WHERE qr_token = %s",
-        (1, token)
+        (1, token), fetchone=True
     )
-    conn.commit()
+
 
     # Optional: insert into attendance log
-    cursor.execute(
+    db.execute(
         "INSERT INTO attendance (collector_id_code, check_in) VALUES (%s, %s)",
-        (collector_code, now)
+        (collector_code, now), fetchone=True
     )
-    conn.commit()
+
 
     return f"""
     <h2>Welcome!</h2>

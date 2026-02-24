@@ -4,6 +4,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Database import Database
 from services.property_service import Property_service
+from services.auth import Login
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -47,6 +48,7 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 #--------------------------------------MYSQL Database connection--------------------------------------------------------------#
 db = Database()
+login_service = Login(db)
 
 from fastapi.responses import PlainTextResponse
 import traceback
@@ -105,54 +107,23 @@ def submit_form(
     password: str = Form(...)
 ):
     # Try owner login
-    row=db.execute(
-        """
-        SELECT owner_id
-        FROM contacts
-        WHERE email = %s AND password = %s
-        """,
-        (last_name, password), True
-    )
-
-
-    if row:
-        owner_id = row[0]
+    login_details=login_service.login(last_name=last_name, password=password)
+    print(login_details)
+    if login_details[1]=="owner":
+        owner_id = login_details[0][0]
         return RedirectResponse(
             url=f"/propertylist/{owner_id}",
             status_code=303
         )
-
-    # Try admin login
-    row=db.execute(
-        """
-        SELECT admin_login_id
-        FROM admin_login
-        WHERE admin_username = %s AND admin_password = %s
-        """,
-        (last_name, password), True
-    )
-
-
-    if row:
-        admin_id = row[0]
+    if login_details[1]=="admin":
+        admin_id = login_details[0][0]
         return RedirectResponse(
             url=f"/admin/{admin_id}",
             status_code=303
         )
 
-    # Try admin login
-    row=db.execute(
-        """
-        SELECT collector_id_code
-        FROM collectors
-        WHERE collector_id_code = %s AND collector_password = %s AND at_work = 1
-        """,
-        (last_name, password), True
-    )
-
-
-    if row:
-        collector_id = row[0]
+    if login_details[1]=="collector":
+        collector_id = login_details[0][0]
         return RedirectResponse(
             url=f"/collector-home/{collector_id}",
             status_code=303

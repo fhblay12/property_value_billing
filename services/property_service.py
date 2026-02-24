@@ -1,13 +1,13 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-from main import BILLING_MULTIPlIER
 
 
 class Property_service:
-        BILLING_MULTIPlIER=0.001
+
         def __init__(self, db):
             self.db = db
+            self.BILLING_MULTIPlIER = 0.001
 
         def create_contact(self, first_name, last_name, phone_number, email, password):
             created_time = datetime.now()
@@ -52,7 +52,7 @@ class Property_service:
                 return owner_id
 
         def create_monthly_bill(self, property_id, property_value, created_time):
-            monthly_bill=property_value*BILLING_MULTIPlIER
+            monthly_bill=property_value*self.BILLING_MULTIPlIER
             one_month_later = created_time + relativedelta(months=1)
             sql = """
                     INSERT INTO billing

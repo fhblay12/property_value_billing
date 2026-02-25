@@ -1,5 +1,7 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from fastapi import FastAPI, UploadFile, File
+from typing import Optional
 
 
 
@@ -68,3 +70,31 @@ class Property_service:
                 one_month_later
             )
             self.db.execute(sql, values)
+
+        async def add_property_files(self, property_id, image1, image2, image3, image4, document1, document2, document3, document4):
+            files_to_insert = []
+            created_time = datetime.now()
+
+            # ---- Images (filetype_id = 1) ----
+            for img in [image1, image2, image3, image4]:
+                if img.filename:
+                    file_bytes = await img.read()
+                    files_to_insert.append(
+                        (property_id, file_bytes, img.filename, 1, created_time)
+                    )
+
+            # ---- Documents (filetype_id = 2) ----
+            for doc in [document1, document2, document3, document4]:
+                if doc.filename:
+                    file_bytes = await doc.read()
+                    files_to_insert.append(
+                        (property_id, file_bytes, doc.filename, 2, created_time)
+                    )
+
+            sql = """
+                INSERT INTO files
+                (property_id, file_data, filename, filetype_id, created_datetime)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+
+            self.db.executemany(sql, files_to_insert)

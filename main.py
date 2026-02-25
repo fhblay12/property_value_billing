@@ -634,32 +634,7 @@ async def submit_form(
     document3: Optional[UploadFile] = File(None),
     document4: Optional[UploadFile] = File(None),
 ):
-    files_to_insert = []
-    created_time = datetime.now()
-
-    # ---- Images (filetype_id = 1) ----
-    for img in [image1, image2, image3, image4]:
-        if img.filename:
-            file_bytes = await img.read()
-            files_to_insert.append(
-                (property_id, file_bytes, img.filename, 1, created_time)
-            )
-
-    # ---- Documents (filetype_id = 2) ----
-    for doc in [document1, document2, document3, document4]:
-        if doc.filename:
-            file_bytes = await doc.read()
-            files_to_insert.append(
-                (property_id, file_bytes, doc.filename, 2, created_time)
-            )
-
-    sql = """
-        INSERT INTO files
-        (property_id, file_data, filename, filetype_id, created_datetime)
-        VALUES (%s, %s, %s, %s, %s)
-    """
-
-    db.executemany(sql, files_to_insert)
+    await Property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
 
     return RedirectResponse(
         url="/",
@@ -688,43 +663,9 @@ async def submit_form(
         description: str = Form(...)
 ):
     created_time = datetime.now()
-    sql2 = """
-       INSERT INTO properties
-       (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
-       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-       """
-    values2 = (
-        owner_id,
-        category,
-        property_value,
-        longitude,
-        latitude,
-        city,
-        digital_address,
-        description,
-        created_time
-    )
-
-    row=db.execute(sql2, values2)
-    property_id = row.lastrowid
-    # --------------------------------MONTHLY BILL---------------------------------------------------------------------------#
-    monthly_bill = property_value * BILLING_MULTIPlIER
-    one_month_later = created_time + relativedelta(months=1)
-    sql3 = """
-            INSERT INTO billing
-            (property_id, monthly_bill, created_datetime, billing_date)
-
-            VALUES (%s, %s, %s, %s)
-    """
-
-    values3 = (
-        property_id,
-        monthly_bill,
-        created_time,
-        one_month_later
-    )
-    db.execute(sql3, values3)
-
+    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
+ 
+  
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET

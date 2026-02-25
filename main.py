@@ -4,7 +4,9 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Database import Database
 from services.property_service import Property_service
+from services.admin_home import Admin_home_service
 from services.auth import Login
+from repository.admin_home import *
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -141,141 +143,34 @@ def submit_form(
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
 async def admin_login(request: Request, admin_id: int):
 
-
-    # Fetch category counts
-    data=db.execute("SELECT category_id, COUNT(*) FROM properties GROUP BY category_id", fetchall=True)
-
-
-    labels=["Residential", "Commercial"]
-    categories = [row[0] for row in data]
-    counts = [row[1] for row in data]
-
-    # Create Pie chart using Plotly
-    fig = go.Figure(data=[go.Pie(labels=labels, values=counts, hole=0.3)])
-    fig.update_layout(
-        title=dict(
-            text="Property category",
-            font=dict(
-                size=20,
-                color="#000000",
-                family="Arial Black"  # ✅ bold
-            )
-        ),
-        paper_bgcolor="#668cff",  # outside chart
-        plot_bgcolor="#668cff",
-        font=dict(color="#000000"),
-    )
-
-    data=db.execute("SELECT city, COUNT(*) FROM properties GROUP BY city", fetchall=True)
+    pie_div = pio.to_html(Admin_home_service.get_category_counts()["fig"], full_html=False)
+    pie_div2 = pio.to_html(Admin_home_service.get_city_counts()["fig"], full_html=False)
 
 
-
-
-    cities = [row[0] for row in data]
-    counts = [row[1] for row in data]
-
-    # Create Pie chart using Plotly
-    fig2 = go.Figure(data=[go.Pie(labels=cities, values=counts, hole=0.3)])
-    fig2.update_layout(
-        title=dict(
-            text="Property cities",
-            font=dict(
-                size=20,
-                color="#000000",
-                family="Arial Black"  # ✅ bold
-            )
-        ),
-        paper_bgcolor="#668cff",  # outside chart
-        plot_bgcolor="#668cff",
-        font=dict(color="#000000"),
-    )
-
-    # Convert Plotly figure to HTML div
-    pie_div = pio.to_html(fig, full_html=False)
-    pie_div2 = pio.to_html(fig2, full_html=False)
-    count_of_props=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    properties
-    WHERE
-    created_datetime = CURDATE()""", fetchall=True
-    )[0][0]
+    count_of_props=Admin_home_service.property_count_today()
     number_of_props=str(count_of_props)
 
-    count_of_contacts=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    contacts
-    WHERE
-    created_datetime = CURDATE()""", fetchall=True
-    )[0][0]
+    count_of_contacts=Admin_home_service.contact_count_today()
     number_of_contacts=str(count_of_contacts)
 
-    count_of_total_props=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    properties
-    """, fetchall=True
-    )[0][0]
+    count_of_total_props=Admin_home_service.property_count()
     total_number_of_props=str(count_of_total_props)
     print(number_of_props)
 
-    total_exp_revenue=db.execute(
-        """SELECT SUM(monthly_bill) AS total
-            FROM billing
-        """, fetchall=True
-    )[0][0]
+    total_exp_revenue=Admin_home_service.expected_monthly_revenue()
     expected_revenue = int(total_exp_revenue)
     print(expected_revenue)
-    total_rec_revenue=db.execute(
-        """SELECT SUM(monthly_bill) AS total
-            FROM billing
-            WHERE has_been_paid = 1
-        """, fetchall=True
-    )[0][0]
+    total_rec_revenue=Admin_home_service.total_revenue_collected()
     received_revenue = int(total_rec_revenue)
     print(expected_revenue)
 
-    rows=db.execute("""
-        SELECT payment_date, SUM(monthly_bill) AS total_revenue
-        FROM billing
-        WHERE has_been_paid = 1
-        GROUP BY payment_date
-        ORDER BY payment_date
-    """, fetchall=True)
+    rows=Admin_home_service.revenue_by_payment_date()
 
     # Fetch and convert dates
     print(rows)
-    date_strings = [row[0].date().isoformat() for row in rows]
-    revenue = [row[1] for row in rows]
-
-
-    # Create Plotly line chart
-    fig3 = go.Figure()
-    fig3.add_trace(go.Bar(
-        x=date_strings,
-        y=revenue,
-        name='Revenue',
-
-    ))
-
-    # Dark theme
-    fig3.update_layout(
-    title=dict(
-        text="Daily Revenue",
-        font=dict(
-            size=20,
-            color="#000000",
-            family="Arial Black"  # ✅ bold
-        )
-    ),
-    paper_bgcolor="#668cff",
-    plot_bgcolor="#668cff",
-    font=dict(color="#000000"),
-    )
-
-    # Convert to HTML div for FastAPI template
-    chart_html = pio.to_html(fig3, full_html=False)
+    date_strings = [row[0].date().isoformat() for row in rows["date_strings"]]
+    revenue = [row[1] for row in rows["revenue"]]
+    chart_html = rows["chart_html"]
 
     return templates.TemplateResponse(
         "admin_home.html",

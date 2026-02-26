@@ -7,6 +7,7 @@ from services.property_service import Property_service
 from services.admin_home import Admin_home_service
 from services.auth import Login
 from repository.admin_home import *
+from services.admin_property_list import Admin_property_list_service
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -200,21 +201,7 @@ async def admin_property_list(
     has_been_paid: str | None = Query(None),
 ):
 
-
-    base_query = """
-        SELECT p.*, b.has_been_paid
-        FROM properties p
-        JOIN billing b ON p.property_id = b.property_id
-        
-    """
-
-    conditions, filter_params = build_property_filters(q, city, category, has_been_paid)
-    params =  filter_params
-
-    if conditions:
-        base_query += " AND " + " AND ".join(conditions)
-
-    rows=db.execute(base_query, tuple(params), fetchall=True)
+    rows=Admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
 
 
     # Map category_id to human-readable

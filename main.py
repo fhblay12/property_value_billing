@@ -3,10 +3,11 @@ import io
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Database import Database
+from repository.admin_property_list import Admin_property_list_repository
 from services.property_service import Property_service
 from services.admin_home import Admin_home_service
 from services.auth import Login
-from repository.admin_home import *
+from repository.admin_home import Admin_home_repository
 from services.admin_property_list import Admin_property_list_service
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
@@ -16,12 +17,13 @@ from fastapi.staticfiles import StaticFiles
 import mysql.connector
 from typing import Optional
 from starlette.responses import StreamingResponse
-import plotly.graph_objs as go
 import plotly.io as pio
 from fastapi.responses import JSONResponse
 import qrcode
 import secrets
 from datetime import datetime, timedelta
+
+
 
 def generate_qr_with_token(collector_code, expire_minutes=60):
     # Generate a secure random token
@@ -143,34 +145,35 @@ def submit_form(
 #---------------------------------ADMIN HOME------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
 async def admin_login(request: Request, admin_id: int):
+    
+    admin_home_repository=Admin_home_repository(db)
+    admin_home_service=Admin_home_service(admin_home_repository)
+    pie_div = pio.to_html(admin_home_service.get_category_counts()["fig"], full_html=False)
+    pie_div2 = pio.to_html(admin_home_service.get_city_counts()["fig"], full_html=False)
 
-    pie_div = pio.to_html(Admin_home_service.get_category_counts()["fig"], full_html=False)
-    pie_div2 = pio.to_html(Admin_home_service.get_city_counts()["fig"], full_html=False)
 
-
-    count_of_props=Admin_home_service.property_count_today()
+    count_of_props=admin_home_service.property_count_today()
     number_of_props=str(count_of_props)
 
-    count_of_contacts=Admin_home_service.contact_count_today()
+    count_of_contacts=admin_home_service.contact_count_today()
     number_of_contacts=str(count_of_contacts)
 
-    count_of_total_props=Admin_home_service.property_count()
+    count_of_total_props=admin_home_service.property_count()
     total_number_of_props=str(count_of_total_props)
     print(number_of_props)
 
-    total_exp_revenue=Admin_home_service.expected_monthly_revenue()
+    total_exp_revenue=admin_home_service.expected_monthly_revenue()
     expected_revenue = int(total_exp_revenue)
     print(expected_revenue)
-    total_rec_revenue=Admin_home_service.total_revenue_collected()
+    total_rec_revenue=admin_home_service.total_revenue_collected()
     received_revenue = int(total_rec_revenue)
     print(expected_revenue)
 
-    rows=Admin_home_service.revenue_by_payment_date()
+    rows=admin_home_service.revenue_by_payment_date()
 
     # Fetch and convert dates
     print(rows)
-    date_strings = [row[0].date().isoformat() for row in rows["date_strings"]]
-    revenue = [row[1] for row in rows["revenue"]]
+
     chart_html = rows["chart_html"]
 
     return templates.TemplateResponse(
@@ -200,8 +203,9 @@ async def admin_property_list(
     category: str | None = Query(None),
     has_been_paid: str | None = Query(None),
 ):
-
-    rows=Admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
+    admin_property_list_repository=Admin_property_list_repository(db)
+    admin_property_list_service=Admin_property_list_service(db, admin_property_list_repository)
+    rows=admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
 
 
     # Map category_id to human-readable
@@ -226,21 +230,7 @@ def export_properties_csv(
 ):
 
 
-    base_query = """
-        SELECT p.property_id, p.digital_address, p.city,
-               b.monthly_bill, b.billing_date, b.has_been_paid
-        FROM properties p
-        JOIN billing b ON p.property_id = b.property_id
-        
-    """
-
-    conditions, filter_params = build_property_filters(q, city, category, has_been_paid)
-    params =  filter_params
-
-    if conditions:
-        base_query += " AND " + " AND ".join(conditions)
-
-    rows=db.execute(base_query, tuple(params), fetchall=True)
+    rows = Admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
 
     output = io.StringIO()
     writer = csv.writer(output)

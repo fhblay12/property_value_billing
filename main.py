@@ -8,6 +8,7 @@ from services.property_service import Property_service
 from services.admin_home import Admin_home_service
 from services.auth import Login
 from repository.admin_home import Admin_home_repository
+from repository.admin_contact_list import Admin_contact_list_repository
 from services.admin_property_list import Admin_property_list_service
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
@@ -237,21 +238,13 @@ def export_properties_csv(
 #---------------------------------ADMIN CONTACT_LIST------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/contact_list", response_class=HTMLResponse)
 async def contact_list(request: Request, admin_id: int, q: str | None = Query(None)):
+    admin_contact_list_repository=Admin_contact_list_repository(db)
     if q:
         search = f"%{q}%"
-        row=db.execute("""
-                SELECT * FROM contacts WHERE  (
-                      first_name LIKE %s
-                      OR last_name LIKE %s
-                      OR phone_number LIKE %s
-
-                    ) 
-        """, (search, search, search), fetchall=True
-                       )
+        row=admin_contact_list_repository.get_contact_query(search)
+        
     else:
-        row=db.execute("""
-            SELECT * FROM CONTACTS
-        """, fetchall=True)
+        row=admin_contact_list_repository.get_contacts()
     contacts=row
     print(contacts)
     return templates.TemplateResponse(

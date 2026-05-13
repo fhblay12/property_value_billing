@@ -1,5 +1,3 @@
-from repository.admin_property_list import Admin_property_list_repository
-from starlette.responses import StreamingResponse
 
 class Admin_contact_list_repository:
 

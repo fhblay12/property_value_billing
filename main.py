@@ -114,35 +114,8 @@ def submit_form(
 ):
     # Try owner login
     login_details=login_service.login(last_name=last_name, password=password)
-    print(login_details)
-    if login_details[1]=="owner":
-        owner_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/propertylist/{owner_id}",
-            status_code=303
-        )
-    if login_details[1]=="admin":
-        admin_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/admin/{admin_id}",
-            status_code=303
-        )
-
-    if login_details[1]=="collector":
-        collector_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/collector-home/{collector_id}",
-            status_code=303
-        )
-
-    # If neither matched
-    return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
-            "error": "Invalid credentials"
-        }
-    )
+   
+    return login_details
 #---------------------------------ADMIN HOME------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
 async def admin_login(request: Request, admin_id: int):

@@ -1,3 +1,9 @@
+from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+
 class Login:
     def __init__(self, db):
         self.db = db
@@ -35,4 +41,33 @@ class Login:
                 (last_name, password), True
             )
                 type="collector"
-        return row, type
+
+        login_details = (row, type)
+        if login_details[1]=="owner":
+            owner_id = login_details[0][0]
+            return RedirectResponse(
+                url=f"/propertylist/{owner_id}",
+                status_code=303
+            )
+        if login_details[1]=="admin":
+            admin_id = login_details[0][0]
+            return RedirectResponse(
+                url=f"/admin/{admin_id}",
+                status_code=303
+            )
+
+        if login_details[1]=="collector":
+            collector_id = login_details[0][0]
+            return RedirectResponse(
+                url=f"/collector-home/{collector_id}",
+                status_code=303
+            )
+
+        # If neither matched
+        return RedirectResponse(
+            url="/login?error=Invalid credentials",
+            status_code=303
+        )
+
+
+     

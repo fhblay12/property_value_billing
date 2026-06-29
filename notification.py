@@ -2,6 +2,7 @@
 
 
 
+import os
 import smtplib
 import mysql.connector
 import time
@@ -34,12 +35,11 @@ def send_email(email, first_name, last_name, bill, address):
 
 def main():
     conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="6172BBbb!",
-        database="property_value_billing",
-        autocommit = True
-
+        host=os.getenv("MYSQL_HOST", "localhost"),
+        user=os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("MYSQL_PASSWORD", "6172BBbb!"),
+        database=os.getenv("MYSQL_DATABASE", "property_value_billing"),
+        autocommit=True
     )
 
 

@@ -7,14 +7,14 @@ class Admin_property_list_service:
             self.db = db
             self.base_query = Admin_property_list_repository.base_query
 
-        def apply_conditions(self, q: str | None, city: str | None, category: int | None, has_been_paid: int | None):
+        def apply_conditions(self, q: str | None, city: str | None, category: str | None, has_been_paid: str | None):
             conditions, params = Admin_property_list_repository.build_property_filters(q, city, category, has_been_paid)
             base_query = self.base_query
             if conditions:
                 base_query += " AND " + " AND ".join(conditions)
             return self.db.execute(base_query, tuple(params), fetchall=True)
         
-        def export_properties_csv(self, rows, admin_id: int, q: str | None, city: str | None, category: int | None, has_been_paid: int | None):
+        def export_properties_csv(self, rows, admin_id: str, q: str | None, city: str | None, category: str | None, has_been_paid: str | None):
             import csv
             import io
             output = io.StringIO()

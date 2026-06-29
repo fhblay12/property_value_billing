@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+mysql-connector-python
+python-dateutil
+plotly
+qrcode[pil]
+jinja2
+python-multipart
+starlette==0.27.0
+python-dotenv

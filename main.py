@@ -48,6 +48,8 @@ def generate_qr_with_token(collector_code, expire_minutes=60):
 
 
 BILLING_MULTIPlIER=0.001
+CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
+CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -118,7 +120,7 @@ def submit_form(
     return login_details
 #---------------------------------ADMIN HOME------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
-async def admin_login(request: Request, admin_id: int):
+async def admin_login(request: Request, admin_id: str):
     
     admin_home_repository=Admin_home_repository(db)
     admin_home_service=Admin_home_service(admin_home_repository)
@@ -171,7 +173,7 @@ async def admin_login(request: Request, admin_id: int):
 @app.get("/admin/{admin_id}/property_list", response_class=HTMLResponse)
 async def admin_property_list(
     request: Request,
-    admin_id: int,
+    admin_id: str,
     q: str | None = Query(None),
     city: str | None = Query(None),
     category: str | None = Query(None),
@@ -183,7 +185,11 @@ async def admin_property_list(
 
 
     # Map category_id to human-readable
-    categories = ["residential" if row[1] == 1 else "commercial" for row in rows]
+    category_names = {
+        CATEGORY_RESIDENTIAL_ID: "residential",
+        CATEGORY_COMMERCIAL_ID: "commercial"
+    }
+    categories = [category_names.get(row[1], "unknown") for row in rows]
     paid_or_not = ["Yes" if str(row[-1]) == "1" else "No" for row in rows]
 
     combined = zip(rows, categories, paid_or_not)
@@ -196,7 +202,7 @@ async def admin_property_list(
 
 @app.get("/admin/{admin_id}/export-csv")
 def export_properties_csv(
-    admin_id: int,
+    admin_id: str,
     q: str | None = None,
     city: str | None = None,
     category: str | None = None,
@@ -210,7 +216,7 @@ def export_properties_csv(
     
 #---------------------------------ADMIN CONTACT_LIST------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/contact_list", response_class=HTMLResponse)
-async def contact_list(request: Request, admin_id: int, q: str | None = Query(None)):
+async def contact_list(request: Request, admin_id: str, q: str | None = Query(None)):
     admin_contact_list_repository=Admin_contact_list_repository(db)
     if q:
         search = f"%{q}%"
@@ -230,7 +236,7 @@ async def contact_list(request: Request, admin_id: int, q: str | None = Query(No
     )
 #--------------------------------ADMIN PROPERTY VIEW------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/property_view/{property_id}", response_class=HTMLResponse)
-async def admin_property_view(request: Request, admin_id: int, property_id: int):
+async def admin_property_view(request: Request, admin_id: str, property_id: str):
 
     property_view=db.execute(
         """
@@ -270,7 +276,7 @@ async def admin_property_view(request: Request, admin_id: int, property_id: int)
     )
 #--------------------------------ADMIN CONTACT VIEW------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/contact_view/{owner_id}", response_class=HTMLResponse)
-async def admin_property_view(request: Request, admin_id: int, owner_id: int):
+async def admin_property_view(request: Request, admin_id: str, owner_id: str):
 
     contact_view=db.execute(
         """
@@ -302,7 +308,7 @@ async def admin_property_view(request: Request, admin_id: int, owner_id: int):
 @app.get("/propertylist/{owner_id}", response_class=HTMLResponse)
 async def show_property_list(
     request: Request,
-    owner_id: int,
+    owner_id: str,
     q: str | None = Query(None),
     city: str | None = Query(None),
     category: str | None = Query(None),
@@ -339,7 +345,7 @@ async def show_property_list(
         params.append(f"%{city}%")
 
     # 🗂️ Category filter
-    if category in ("1", "2"):
+    if category:
         conditions.append("p.category_id = %s")
         params.append(category)
 
@@ -357,18 +363,16 @@ async def show_property_list(
 
     property_list=db.execute(base_query, tuple(params), False , True)
     print(property_list)
-    category_id = [property[1] for property in property_list]
-    has_been_paid = [property[6] for property in property_list]
-    old_value = 1
-    category1 = "residential"
-    category2 = "commercial"
-    paid="Yes"
-    not_paid="No"
-    categories = [category1 if id == old_value else category2 for id in category_id]
-    paid_or_not = [paid if item == 1 else not_paid for item in has_been_paid]
+    category_names = {
+        CATEGORY_RESIDENTIAL_ID: "residential",
+        CATEGORY_COMMERCIAL_ID: "commercial"
+    }
+    categories = [category_names.get(property[1], "unknown") for property in property_list]
+    has_been_paid_values = [property[6] for property in property_list]
+    paid_or_not = ["Yes" if item == 1 else "No" for item in has_been_paid_values]
     combined = zip(property_list, categories, paid_or_not)
     #print(categories)
-    print(has_been_paid)
+    print(has_been_paid_values)
 
     return templates.TemplateResponse(
         "property_list.html",
@@ -381,7 +385,7 @@ async def show_property_list(
     )
 
 @app.post("/propertylist/{owner_id}")
-async def submit_form(owner_id: int):
+async def submit_form(owner_id: str):
     property_id=db.execute(
         """
         SELECT property_id FROM properties
@@ -411,7 +415,7 @@ async def submit_form(
     last_name: str = Form(...),
     phone_number: str = Form(...),
     email: str = Form(... ),
-    category: int = Form(...),
+    category: str = Form(...),
     property_value: int = Form(...),
     longitude: float = Form(...),
     latitude: float = Form(...),
@@ -436,7 +440,7 @@ async def submit_form(
 
 
 @app.get("/image&docs/{property_id}", response_class=HTMLResponse)
-async def show_image_docs_form(request: Request, property_id: int):
+async def show_image_docs_form(request: Request, property_id: str):
     return templates.TemplateResponse(
         "image&docs.html",
         {
@@ -447,7 +451,7 @@ async def show_image_docs_form(request: Request, property_id: int):
 
 @app.post("/image&docs/{property_id}")
 async def submit_form(
-    property_id: int,
+    property_id: str,
     image1: UploadFile = File(...),
     image2: UploadFile = File(...),
     image3: Optional[UploadFile] = File(None),
@@ -466,7 +470,7 @@ async def submit_form(
 
 #--------------------------------------------------------------------ADD PROPERTY---------------------------------------------------------------------------------------------#
 @app.get("/addproperty/{owner_id}", response_class=HTMLResponse)
-async def show_form(request: Request, owner_id : int):
+async def show_form(request: Request, owner_id : str):
     return templates.TemplateResponse(
         "add_property.html",
         {"request": request,
@@ -476,8 +480,8 @@ async def show_form(request: Request, owner_id : int):
 
 @app.post("/addproperty/{owner_id}")
 async def submit_form(
-        owner_id: int,
-        category: int = Form(...),
+        owner_id: str,
+        category: str = Form(...),
         property_value: int = Form(...),
         longitude: float = Form(...),
         latitude: float = Form(...),
@@ -497,7 +501,7 @@ async def submit_form(
 
 #--------------------------------PAY------------------------------------------------------------------------------#
 @app.get("/pay/{property_id}", response_class=HTMLResponse)
-async def show_form(request: Request, property_id: int):
+async def show_form(request: Request, property_id: str):
     db.execute(
         """
         UPDATE billing
@@ -524,7 +528,7 @@ async def show_form(request: Request, property_id: int):
 
 #--------------------------------------------------------------MAP OF ALL PROPERTIES-------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/property_map")
-async def submit_form(request: Request, admin_id: int):
+async def submit_form(request: Request, admin_id: str):
 
     sql = """
         SELECT latitude, longitude FROM properties
@@ -616,7 +620,7 @@ AND b.has_been_paid =0
 
 #----------------------------------------------------------Collectors List --------------------------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/collector_list", response_class=HTMLResponse)
-async def admin_login(request: Request, admin_id: int):
+async def admin_login(request: Request, admin_id: str):
     # Fetch category counts
     collectors = db.execute("SELECT * FROM collectors", fetchall=True)
     work_status = ["not at work" if item[7] == 0 else "at work" for item in collectors]
@@ -637,7 +641,7 @@ async def admin_login(request: Request, admin_id: int):
 
 @app.post("/admin/{admin_id}/update_collector")
 async def update_collector(
-    admin_id: int,
+    admin_id: str,
     collector_id: str = Form(...),
     work_status: int = Form(...)
 ):

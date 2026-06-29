@@ -1,4 +1,5 @@
 
+import os
 import smtplib
 import mysql.connector
 from email.message import EmailMessage
@@ -6,10 +7,10 @@ from datetime import datetime
 
 # SQL DATABASE CONNECTION
 conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="6172BBbb!",
-    database="property_value_billing"
+    host=os.getenv("MYSQL_HOST", "localhost"),
+    user=os.getenv("MYSQL_USER", "root"),
+    password=os.getenv("MYSQL_PASSWORD", "6172BBbb!"),
+    database=os.getenv("MYSQL_DATABASE", "property_value_billing")
 )
 cursor = conn.cursor()
 

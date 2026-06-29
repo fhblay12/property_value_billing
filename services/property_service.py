@@ -1,6 +1,13 @@
+import uuid
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from fastapi import FastAPI, UploadFile, File
+from typing import Optional
 
+CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
+CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
+FILETYPE_IMAGE_ID = "33333333-3333-3333-3333-333333333333"
+FILETYPE_DOCUMENT_ID = "44444444-4444-4444-4444-444444444444"
 
 
 class Property_service:
@@ -10,14 +17,16 @@ class Property_service:
             self.BILLING_MULTIPlIER = 0.001
 
         def create_contact(self, first_name, last_name, phone_number, email, password):
+            owner_id = str(uuid.uuid4())
             created_time = datetime.now()
             sql = """
                    INSERT INTO contacts
-                   (first_name, last_name, phone_number, email, created_datetime, updated_datetime, password)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   (owner_id, first_name, last_name, phone_number, email, created_datetime, updated_datetime, password)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                    """
 
             values = (
+                owner_id,
                 first_name,
                 last_name,
                 phone_number,
@@ -26,17 +35,19 @@ class Property_service:
                 created_time,
                 password
             )
-            owner_id = self.db.execute(sql, values)
+            self.db.execute(sql, values)
             return owner_id
         def create_property(self, owner_id, category, value, longitude, latitude, city, property_value, digital_address, description):
+                property_id = str(uuid.uuid4())
                 created_time = datetime.now()
 
                 sql = """
                    INSERT INTO properties
-                   (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   (property_id, owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    """
                 values = (
+                    property_id,
                     owner_id,
                     category,
                     property_value,
@@ -47,9 +58,9 @@ class Property_service:
                     description,
                     created_time
                 )
-                owner_id = self.db.execute(sql, values)
-                self.create_monthly_bill(owner_id, value, created_time)
-                return owner_id
+                self.db.execute(sql, values)
+                self.create_monthly_bill(property_id, value, created_time)
+                return property_id
 
         def create_monthly_bill(self, property_id, property_value, created_time):
             monthly_bill=property_value*self.BILLING_MULTIPlIER
@@ -68,3 +79,31 @@ class Property_service:
                 one_month_later
             )
             self.db.execute(sql, values)
+
+        async def add_property_files(self, property_id, image1, image2, image3, image4, document1, document2, document3, document4):
+            files_to_insert = []
+            created_time = datetime.now()
+
+            # ---- Images (filetype_id = image UUID) ----
+            for img in [image1, image2, image3, image4]:
+                if img.filename:
+                    file_bytes = await img.read()
+                    files_to_insert.append(
+                        (property_id, file_bytes, img.filename, FILETYPE_IMAGE_ID, created_time)
+                    )
+
+            # ---- Documents (filetype_id = document UUID) ----
+            for doc in [document1, document2, document3, document4]:
+                if doc.filename:
+                    file_bytes = await doc.read()
+                    files_to_insert.append(
+                        (property_id, file_bytes, doc.filename, FILETYPE_DOCUMENT_ID, created_time)
+                    )
+
+            sql = """
+                INSERT INTO files
+                (property_id, file_data, filename, filetype_id, created_datetime)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+
+            self.db.executemany(sql, files_to_insert)

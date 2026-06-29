@@ -5,7 +5,7 @@
     <title>Admin home</title>
     <link rel="stylesheet" href="/static/style.css">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
 <h1 class="list_h1">Admin Home</h1>
@@ -38,28 +38,6 @@
 </div>
 
 
-  <script>
-    const ctx = document.getElementById('myChart').getContext('2d');
-
-    const myChart = new Chart(ctx, {
-      type: 'line', // bar, pie, doughnut, radar, etc.
-      data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-        datasets: [{
-          label: 'Sales',
-          data: [12, 19, 3, 5, 2],
-          borderWidth: 2
-        }]
-      },
-      options: {
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      }
-    });
-  </script>
 <br>
 <br>
 <br>

@@ -3,8 +3,13 @@ import io
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Database import Database
+from repository.admin_property_list import Admin_property_list_repository
 from services.property_service import Property_service
+from services.admin_home import Admin_home_service
 from services.auth import Login
+from repository.admin_home import Admin_home_repository
+from repository.admin_contact_list import Admin_contact_list_repository
+from services.admin_property_list import Admin_property_list_service
 from fastapi import FastAPI, Form, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -13,12 +18,13 @@ from fastapi.staticfiles import StaticFiles
 import mysql.connector
 from typing import Optional
 from starlette.responses import StreamingResponse
-import plotly.graph_objs as go
 import plotly.io as pio
 from fastapi.responses import JSONResponse
 import qrcode
 import secrets
 from datetime import datetime, timedelta
+
+
 
 def generate_qr_with_token(collector_code, expire_minutes=60):
     # Generate a secure random token
@@ -42,6 +48,8 @@ def generate_qr_with_token(collector_code, expire_minutes=60):
 
 
 BILLING_MULTIPlIER=0.001
+CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
+CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -108,174 +116,41 @@ def submit_form(
 ):
     # Try owner login
     login_details=login_service.login(last_name=last_name, password=password)
-    print(login_details)
-    if login_details[1]=="owner":
-        owner_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/propertylist/{owner_id}",
-            status_code=303
-        )
-    if login_details[1]=="admin":
-        admin_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/admin/{admin_id}",
-            status_code=303
-        )
-
-    if login_details[1]=="collector":
-        collector_id = login_details[0][0]
-        return RedirectResponse(
-            url=f"/collector-home/{collector_id}",
-            status_code=303
-        )
-
-    # If neither matched
-    return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
-            "error": "Invalid credentials"
-        }
-    )
+   
+    return login_details
 #---------------------------------ADMIN HOME------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}", response_class=HTMLResponse)
-async def admin_login(request: Request, admin_id: int):
+async def admin_login(request: Request, admin_id: str):
+    
+    admin_home_repository=Admin_home_repository(db)
+    admin_home_service=Admin_home_service(admin_home_repository)
+    pie_div = pio.to_html(admin_home_service.get_category_counts()["fig"], full_html=False)
+    pie_div2 = pio.to_html(admin_home_service.get_city_counts()["fig"], full_html=False)
 
 
-    # Fetch category counts
-    data=db.execute("SELECT category_id, COUNT(*) FROM properties GROUP BY category_id", fetchall=True)
-
-
-    labels=["Residential", "Commercial"]
-    categories = [row[0] for row in data]
-    counts = [row[1] for row in data]
-
-    # Create Pie chart using Plotly
-    fig = go.Figure(data=[go.Pie(labels=labels, values=counts, hole=0.3)])
-    fig.update_layout(
-        title=dict(
-            text="Property category",
-            font=dict(
-                size=20,
-                color="#000000",
-                family="Arial Black"  # ✅ bold
-            )
-        ),
-        paper_bgcolor="#668cff",  # outside chart
-        plot_bgcolor="#668cff",
-        font=dict(color="#000000"),
-    )
-
-    data=db.execute("SELECT city, COUNT(*) FROM properties GROUP BY city", fetchall=True)
-
-
-
-
-    cities = [row[0] for row in data]
-    counts = [row[1] for row in data]
-
-    # Create Pie chart using Plotly
-    fig2 = go.Figure(data=[go.Pie(labels=cities, values=counts, hole=0.3)])
-    fig2.update_layout(
-        title=dict(
-            text="Property cities",
-            font=dict(
-                size=20,
-                color="#000000",
-                family="Arial Black"  # ✅ bold
-            )
-        ),
-        paper_bgcolor="#668cff",  # outside chart
-        plot_bgcolor="#668cff",
-        font=dict(color="#000000"),
-    )
-
-    # Convert Plotly figure to HTML div
-    pie_div = pio.to_html(fig, full_html=False)
-    pie_div2 = pio.to_html(fig2, full_html=False)
-    count_of_props=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    properties
-    WHERE
-    created_datetime = CURDATE()""", fetchall=True
-    )[0][0]
+    count_of_props=admin_home_service.property_count_today()
     number_of_props=str(count_of_props)
 
-    count_of_contacts=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    contacts
-    WHERE
-    created_datetime = CURDATE()""", fetchall=True
-    )[0][0]
+    count_of_contacts=admin_home_service.contact_count_today()
     number_of_contacts=str(count_of_contacts)
 
-    count_of_total_props=db.execute(
-    """SELECT COUNT(*)
-    FROM
-    properties
-    """, fetchall=True
-    )[0][0]
+    count_of_total_props=admin_home_service.property_count()
     total_number_of_props=str(count_of_total_props)
     print(number_of_props)
 
-    total_exp_revenue=db.execute(
-        """SELECT SUM(monthly_bill) AS total
-            FROM billing
-        """, fetchall=True
-    )[0][0]
+    total_exp_revenue=admin_home_service.expected_monthly_revenue()
     expected_revenue = int(total_exp_revenue)
     print(expected_revenue)
-    total_rec_revenue=db.execute(
-        """SELECT SUM(monthly_bill) AS total
-            FROM billing
-            WHERE has_been_paid = 1
-        """, fetchall=True
-    )[0][0]
+    total_rec_revenue=admin_home_service.total_revenue_collected()
     received_revenue = int(total_rec_revenue)
     print(expected_revenue)
 
-    rows=db.execute("""
-        SELECT payment_date, SUM(monthly_bill) AS total_revenue
-        FROM billing
-        WHERE has_been_paid = 1
-        GROUP BY payment_date
-        ORDER BY payment_date
-    """, fetchall=True)
+    rows=admin_home_service.revenue_by_payment_date()
 
     # Fetch and convert dates
     print(rows)
-    date_strings = [row[0].date().isoformat() for row in rows]
-    revenue = [row[1] for row in rows]
 
-
-    # Create Plotly line chart
-    fig3 = go.Figure()
-    fig3.add_trace(go.Bar(
-        x=date_strings,
-        y=revenue,
-        name='Revenue',
-
-    ))
-
-    # Dark theme
-    fig3.update_layout(
-    title=dict(
-        text="Daily Revenue",
-        font=dict(
-            size=20,
-            color="#000000",
-            family="Arial Black"  # ✅ bold
-        )
-    ),
-    paper_bgcolor="#668cff",
-    plot_bgcolor="#668cff",
-    font=dict(color="#000000"),
-    )
-
-    # Convert to HTML div for FastAPI template
-    chart_html = pio.to_html(fig3, full_html=False)
+    chart_html = rows["chart_html"]
 
     return templates.TemplateResponse(
         "admin_home.html",
@@ -298,32 +173,23 @@ async def admin_login(request: Request, admin_id: int):
 @app.get("/admin/{admin_id}/property_list", response_class=HTMLResponse)
 async def admin_property_list(
     request: Request,
-    admin_id: int,
+    admin_id: str,
     q: str | None = Query(None),
     city: str | None = Query(None),
     category: str | None = Query(None),
     has_been_paid: str | None = Query(None),
 ):
-
-
-    base_query = """
-        SELECT p.*, b.has_been_paid
-        FROM properties p
-        JOIN billing b ON p.property_id = b.property_id
-        
-    """
-
-    conditions, filter_params = build_property_filters(q, city, category, has_been_paid)
-    params =  filter_params
-
-    if conditions:
-        base_query += " AND " + " AND ".join(conditions)
-
-    rows=db.execute(base_query, tuple(params), fetchall=True)
+    admin_property_list_repository=Admin_property_list_repository(db)
+    admin_property_list_service=Admin_property_list_service(db, admin_property_list_repository)
+    rows=admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
 
 
     # Map category_id to human-readable
-    categories = ["residential" if row[1] == 1 else "commercial" for row in rows]
+    category_names = {
+        CATEGORY_RESIDENTIAL_ID: "residential",
+        CATEGORY_COMMERCIAL_ID: "commercial"
+    }
+    categories = [category_names.get(row[1], "unknown") for row in rows]
     paid_or_not = ["Yes" if str(row[-1]) == "1" else "No" for row in rows]
 
     combined = zip(rows, categories, paid_or_not)
@@ -336,65 +202,28 @@ async def admin_property_list(
 
 @app.get("/admin/{admin_id}/export-csv")
 def export_properties_csv(
-    admin_id: int,
+    admin_id: str,
     q: str | None = None,
     city: str | None = None,
     category: str | None = None,
     has_been_paid: str | None = None
 ):
+    admin_property_list_repository=Admin_property_list_repository(db)
+    admin_property_list_service=Admin_property_list_service(db, admin_property_list_repository)
 
-
-    base_query = """
-        SELECT p.property_id, p.digital_address, p.city,
-               b.monthly_bill, b.billing_date, b.has_been_paid
-        FROM properties p
-        JOIN billing b ON p.property_id = b.property_id
-        
-    """
-
-    conditions, filter_params = build_property_filters(q, city, category, has_been_paid)
-    params =  filter_params
-
-    if conditions:
-        base_query += " AND " + " AND ".join(conditions)
-
-    rows=db.execute(base_query, tuple(params), fetchall=True)
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["# Property export"])
-    writer.writerow([f"# Generated by admin_id: {admin_id}"])
-    writer.writerow([f"# Filters: q={q}, city={city}, category={category}, paid={has_been_paid}"])
-    writer.writerow([])  # blank line for readability
-
-    writer.writerow(["property_id", "digital_address", "city", "monthly_bill", "billing_date", "has_been_paid"])
-    for row in rows:
-        writer.writerow(row)
-
-    output.seek(0)
-    return StreamingResponse(
-        output,
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=properties.csv"}
-    )
+    rows = admin_property_list_service.apply_conditions(q, city, category, has_been_paid)
+    return admin_property_list_service.export_properties_csv(rows, admin_id, q, city, category, has_been_paid)
+    
 #---------------------------------ADMIN CONTACT_LIST------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/contact_list", response_class=HTMLResponse)
-async def contact_list(request: Request, admin_id: int, q: str | None = Query(None)):
+async def contact_list(request: Request, admin_id: str, q: str | None = Query(None)):
+    admin_contact_list_repository=Admin_contact_list_repository(db)
     if q:
         search = f"%{q}%"
-        row=db.execute("""
-                SELECT * FROM contacts WHERE  (
-                      first_name LIKE %s
-                      OR last_name LIKE %s
-                      OR phone_number LIKE %s
-
-                    ) 
-        """, (search, search, search), fetchall=True
-                       )
+        row=admin_contact_list_repository.get_contact_query(search)
+        
     else:
-        row=db.execute("""
-            SELECT * FROM CONTACTS
-        """, fetchall=True)
+        row=admin_contact_list_repository.get_contacts()
     contacts=row
     print(contacts)
     return templates.TemplateResponse(
@@ -407,7 +236,7 @@ async def contact_list(request: Request, admin_id: int, q: str | None = Query(No
     )
 #--------------------------------ADMIN PROPERTY VIEW------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/property_view/{property_id}", response_class=HTMLResponse)
-async def admin_property_view(request: Request, admin_id: int, property_id: int):
+async def admin_property_view(request: Request, admin_id: str, property_id: str):
 
     property_view=db.execute(
         """
@@ -447,7 +276,7 @@ async def admin_property_view(request: Request, admin_id: int, property_id: int)
     )
 #--------------------------------ADMIN CONTACT VIEW------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/contact_view/{owner_id}", response_class=HTMLResponse)
-async def admin_property_view(request: Request, admin_id: int, owner_id: int):
+async def admin_property_view(request: Request, admin_id: str, owner_id: str):
 
     contact_view=db.execute(
         """
@@ -479,7 +308,7 @@ async def admin_property_view(request: Request, admin_id: int, owner_id: int):
 @app.get("/propertylist/{owner_id}", response_class=HTMLResponse)
 async def show_property_list(
     request: Request,
-    owner_id: int,
+    owner_id: str,
     q: str | None = Query(None),
     city: str | None = Query(None),
     category: str | None = Query(None),
@@ -516,7 +345,7 @@ async def show_property_list(
         params.append(f"%{city}%")
 
     # 🗂️ Category filter
-    if category in ("1", "2"):
+    if category:
         conditions.append("p.category_id = %s")
         params.append(category)
 
@@ -534,18 +363,16 @@ async def show_property_list(
 
     property_list=db.execute(base_query, tuple(params), False , True)
     print(property_list)
-    category_id = [property[1] for property in property_list]
-    has_been_paid = [property[6] for property in property_list]
-    old_value = 1
-    category1 = "residential"
-    category2 = "commercial"
-    paid="Yes"
-    not_paid="No"
-    categories = [category1 if id == old_value else category2 for id in category_id]
-    paid_or_not = [paid if item == 1 else not_paid for item in has_been_paid]
+    category_names = {
+        CATEGORY_RESIDENTIAL_ID: "residential",
+        CATEGORY_COMMERCIAL_ID: "commercial"
+    }
+    categories = [category_names.get(property[1], "unknown") for property in property_list]
+    has_been_paid_values = [property[6] for property in property_list]
+    paid_or_not = ["Yes" if item == 1 else "No" for item in has_been_paid_values]
     combined = zip(property_list, categories, paid_or_not)
     #print(categories)
-    print(has_been_paid)
+    print(has_been_paid_values)
 
     return templates.TemplateResponse(
         "property_list.html",
@@ -558,7 +385,7 @@ async def show_property_list(
     )
 
 @app.post("/propertylist/{owner_id}")
-async def submit_form(owner_id: int):
+async def submit_form(owner_id: str):
     property_id=db.execute(
         """
         SELECT property_id FROM properties
@@ -588,7 +415,7 @@ async def submit_form(
     last_name: str = Form(...),
     phone_number: str = Form(...),
     email: str = Form(... ),
-    category: int = Form(...),
+    category: str = Form(...),
     property_value: int = Form(...),
     longitude: float = Form(...),
     latitude: float = Form(...),
@@ -613,7 +440,7 @@ async def submit_form(
 
 
 @app.get("/image&docs/{property_id}", response_class=HTMLResponse)
-async def show_image_docs_form(request: Request, property_id: int):
+async def show_image_docs_form(request: Request, property_id: str):
     return templates.TemplateResponse(
         "image&docs.html",
         {
@@ -624,7 +451,7 @@ async def show_image_docs_form(request: Request, property_id: int):
 
 @app.post("/image&docs/{property_id}")
 async def submit_form(
-    property_id: int,
+    property_id: str,
     image1: UploadFile = File(...),
     image2: UploadFile = File(...),
     image3: Optional[UploadFile] = File(None),
@@ -634,32 +461,7 @@ async def submit_form(
     document3: Optional[UploadFile] = File(None),
     document4: Optional[UploadFile] = File(None),
 ):
-    files_to_insert = []
-    created_time = datetime.now()
-
-    # ---- Images (filetype_id = 1) ----
-    for img in [image1, image2, image3, image4]:
-        if img.filename:
-            file_bytes = await img.read()
-            files_to_insert.append(
-                (property_id, file_bytes, img.filename, 1, created_time)
-            )
-
-    # ---- Documents (filetype_id = 2) ----
-    for doc in [document1, document2, document3, document4]:
-        if doc.filename:
-            file_bytes = await doc.read()
-            files_to_insert.append(
-                (property_id, file_bytes, doc.filename, 2, created_time)
-            )
-
-    sql = """
-        INSERT INTO files
-        (property_id, file_data, filename, filetype_id, created_datetime)
-        VALUES (%s, %s, %s, %s, %s)
-    """
-
-    db.executemany(sql, files_to_insert)
+    await Property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
 
     return RedirectResponse(
         url="/",
@@ -668,7 +470,7 @@ async def submit_form(
 
 #--------------------------------------------------------------------ADD PROPERTY---------------------------------------------------------------------------------------------#
 @app.get("/addproperty/{owner_id}", response_class=HTMLResponse)
-async def show_form(request: Request, owner_id : int):
+async def show_form(request: Request, owner_id : str):
     return templates.TemplateResponse(
         "add_property.html",
         {"request": request,
@@ -678,8 +480,8 @@ async def show_form(request: Request, owner_id : int):
 
 @app.post("/addproperty/{owner_id}")
 async def submit_form(
-        owner_id: int,
-        category: int = Form(...),
+        owner_id: str,
+        category: str = Form(...),
         property_value: int = Form(...),
         longitude: float = Form(...),
         latitude: float = Form(...),
@@ -688,43 +490,9 @@ async def submit_form(
         description: str = Form(...)
 ):
     created_time = datetime.now()
-    sql2 = """
-       INSERT INTO properties
-       (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
-       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-       """
-    values2 = (
-        owner_id,
-        category,
-        property_value,
-        longitude,
-        latitude,
-        city,
-        digital_address,
-        description,
-        created_time
-    )
-
-    row=db.execute(sql2, values2)
-    property_id = row.lastrowid
-    # --------------------------------MONTHLY BILL---------------------------------------------------------------------------#
-    monthly_bill = property_value * BILLING_MULTIPlIER
-    one_month_later = created_time + relativedelta(months=1)
-    sql3 = """
-            INSERT INTO billing
-            (property_id, monthly_bill, created_datetime, billing_date)
-
-            VALUES (%s, %s, %s, %s)
-    """
-
-    values3 = (
-        property_id,
-        monthly_bill,
-        created_time,
-        one_month_later
-    )
-    db.execute(sql3, values3)
-
+    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
+ 
+  
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET
@@ -733,7 +501,7 @@ async def submit_form(
 
 #--------------------------------PAY------------------------------------------------------------------------------#
 @app.get("/pay/{property_id}", response_class=HTMLResponse)
-async def show_form(request: Request, property_id: int):
+async def show_form(request: Request, property_id: str):
     db.execute(
         """
         UPDATE billing
@@ -760,7 +528,7 @@ async def show_form(request: Request, property_id: int):
 
 #--------------------------------------------------------------MAP OF ALL PROPERTIES-------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/property_map")
-async def submit_form(request: Request, admin_id: int):
+async def submit_form(request: Request, admin_id: str):
 
     sql = """
         SELECT latitude, longitude FROM properties
@@ -852,7 +620,7 @@ AND b.has_been_paid =0
 
 #----------------------------------------------------------Collectors List --------------------------------------------------------------------------------------------------------#
 @app.get("/admin/{admin_id}/collector_list", response_class=HTMLResponse)
-async def admin_login(request: Request, admin_id: int):
+async def admin_login(request: Request, admin_id: str):
     # Fetch category counts
     collectors = db.execute("SELECT * FROM collectors", fetchall=True)
     work_status = ["not at work" if item[7] == 0 else "at work" for item in collectors]
@@ -873,7 +641,7 @@ async def admin_login(request: Request, admin_id: int):
 
 @app.post("/admin/{admin_id}/update_collector")
 async def update_collector(
-    admin_id: int,
+    admin_id: str,
     collector_id: str = Form(...),
     work_status: int = Form(...)
 ):

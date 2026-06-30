@@ -57,6 +57,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 #--------------------------------------MYSQL Database connection--------------------------------------------------------------#
 db = Database()
 login_service = Login(db)
+property_service = Property_service(db)
 
 from fastapi.responses import PlainTextResponse
 import traceback
@@ -427,9 +428,11 @@ async def submit_form(
     first_name = first_name.title()
     last_name = last_name.title()
     city = city.title()
-    owner_id=Property_service.create_contact(first_name, last_name, phone_number, email, password)
-    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
-    Property_service.create_monthly_bill(property_id, property_value)
+    created_time = datetime.now()
+    owner_id = property_service.create_contact(first_name, last_name, phone_number, email, password)
+    property_id = property_service.create_property(
+    owner_id, category, longitude, latitude, city, property_value, digital_address, description
+)
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET
@@ -461,7 +464,7 @@ async def submit_form(
     document3: Optional[UploadFile] = File(None),
     document4: Optional[UploadFile] = File(None),
 ):
-    await Property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
+    await property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
 
     return RedirectResponse(
         url="/",
@@ -490,7 +493,7 @@ async def submit_form(
         description: str = Form(...)
 ):
     created_time = datetime.now()
-    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
+    property_id = property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
  
   
     return RedirectResponse(

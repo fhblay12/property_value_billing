@@ -4,10 +4,10 @@ from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, UploadFile, File
 from typing import Optional
 
-CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
-CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
-FILETYPE_IMAGE_ID = "33333333-3333-3333-3333-333333333333"
-FILETYPE_DOCUMENT_ID = "44444444-4444-4444-4444-444444444444"
+CATEGORY_RESIDENTIAL_ID = "1"
+CATEGORY_COMMERCIAL_ID = "2"
+FILETYPE_IMAGE_ID = "1"
+FILETYPE_DOCUMENT_ID = "2"
 
 
 class Property_service:
@@ -17,16 +17,14 @@ class Property_service:
             self.BILLING_MULTIPlIER = 0.001
 
         def create_contact(self, first_name, last_name, phone_number, email, password):
-            owner_id = str(uuid.uuid4())
             created_time = datetime.now()
             sql = """
-                   INSERT INTO contacts
-                   (owner_id, first_name, last_name, phone_number, email, created_datetime, updated_datetime, password)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                   """
+                INSERT INTO contacts
+                (first_name, last_name, phone_number, email, created_datetime, updated_datetime, password)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
 
             values = (
-                owner_id,
                 first_name,
                 last_name,
                 phone_number,
@@ -35,19 +33,18 @@ class Property_service:
                 created_time,
                 password
             )
-            self.db.execute(sql, values)
+            owner_id = self.db.execute(sql, values)
             return owner_id
-        def create_property(self, owner_id, category, value, longitude, latitude, city, property_value, digital_address, description):
-                property_id = str(uuid.uuid4())
+
+        def create_property(self, owner_id, category, longitude, latitude, city, property_value, digital_address, description):
                 created_time = datetime.now()
 
                 sql = """
                    INSERT INTO properties
-                   (property_id, owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   (owner_id, category_id, property_value, longitude, latitude, city, digital_address, description, created_datetime)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                    """
                 values = (
-                    property_id,
                     owner_id,
                     category,
                     property_value,
@@ -58,8 +55,8 @@ class Property_service:
                     description,
                     created_time
                 )
-                self.db.execute(sql, values)
-                self.create_monthly_bill(property_id, value, created_time)
+                property_id=self.db.execute(sql, values)
+                self.create_monthly_bill(property_id, property_value, created_time)
                 return property_id
 
         def create_monthly_bill(self, property_id, property_value, created_time):

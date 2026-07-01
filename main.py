@@ -23,6 +23,10 @@ from fastapi.responses import JSONResponse
 import qrcode
 import secrets
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 
 

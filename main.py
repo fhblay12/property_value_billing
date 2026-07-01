@@ -50,6 +50,8 @@ def generate_qr_with_token(collector_code, expire_minutes=60):
 BILLING_MULTIPlIER=0.001
 CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
 CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
+FILETYPE_IMAGE_ID = "33333333-3333-3333-3333-333333333333"
+FILETYPE_DOCUMENT_ID = "44444444-4444-4444-4444-444444444444"
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -417,7 +419,7 @@ async def submit_form(
     phone_number: str = Form(...),
     email: str = Form(... ),
     category: str = Form(...),
-    property_value: int = Form(...),
+    property_value: float = Form(...),
     longitude: float = Form(...),
     latitude: float = Form(...),
     city: str = Form(...),
@@ -485,7 +487,7 @@ async def show_form(request: Request, owner_id : str):
 async def submit_form(
         owner_id: str,
         category: str = Form(...),
-        property_value: int = Form(...),
+        property_value: float = Form(...),
         longitude: float = Form(...),
         latitude: float = Form(...),
         city: str = Form(...),

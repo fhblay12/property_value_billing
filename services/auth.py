@@ -43,6 +43,7 @@ class Login:
                 type="collector"
 
         login_details = (row, type)
+        print("Login details:", login_details)  # Debugging line
         if login_details[1]=="owner":
             owner_id = login_details[0][0]
             return RedirectResponse(

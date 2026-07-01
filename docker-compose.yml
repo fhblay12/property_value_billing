@@ -1,13 +1,12 @@
 version: "3.9"
-
 services:
   db:
     image: mysql:8.0
     container_name: property_billing_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: "6172BBbb!"
-      MYSQL_DATABASE: "property_value_billing"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
       MYSQL_ROOT_HOST: "%"
     ports:
       - "3315:3306"
@@ -19,22 +18,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   app:
     build: .
     container_name: property_billing_app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
       MYSQL_HOST: db
       MYSQL_USER: root
-      MYSQL_PASSWORD: "6172BBbb!"
-      MYSQL_DATABASE: property_value_billing
-    volumes:
-      - .:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
 volumes:
   db_data: {}

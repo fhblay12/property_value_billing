@@ -50,6 +50,8 @@ def generate_qr_with_token(collector_code, expire_minutes=60):
 BILLING_MULTIPlIER=0.001
 CATEGORY_RESIDENTIAL_ID = "11111111-1111-1111-1111-111111111111"
 CATEGORY_COMMERCIAL_ID = "22222222-2222-2222-2222-222222222222"
+FILETYPE_IMAGE_ID = "33333333-3333-3333-3333-333333333333"
+FILETYPE_DOCUMENT_ID = "44444444-4444-4444-4444-444444444444"
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -57,6 +59,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 #--------------------------------------MYSQL Database connection--------------------------------------------------------------#
 db = Database()
 login_service = Login(db)
+property_service = Property_service(db)
 
 from fastapi.responses import PlainTextResponse
 import traceback
@@ -416,7 +419,7 @@ async def submit_form(
     phone_number: str = Form(...),
     email: str = Form(... ),
     category: str = Form(...),
-    property_value: int = Form(...),
+    property_value: float = Form(...),
     longitude: float = Form(...),
     latitude: float = Form(...),
     city: str = Form(...),
@@ -427,9 +430,11 @@ async def submit_form(
     first_name = first_name.title()
     last_name = last_name.title()
     city = city.title()
-    owner_id=Property_service.create_contact(first_name, last_name, phone_number, email, password)
-    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
-    Property_service.create_monthly_bill(property_id, property_value)
+    created_time = datetime.now()
+    owner_id = property_service.create_contact(first_name, last_name, phone_number, email, password)
+    property_id = property_service.create_property(
+    owner_id, category, longitude, latitude, city, property_value, digital_address, description
+)
     return RedirectResponse(
         url=f"/image&docs/{property_id}",
         status_code=303  # 303 ensures browser performs a GET
@@ -461,7 +466,7 @@ async def submit_form(
     document3: Optional[UploadFile] = File(None),
     document4: Optional[UploadFile] = File(None),
 ):
-    await Property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
+    await property_service.add_property_files(property_id, image1, image2, image3, image4, document1, document2, document3, document4)
 
     return RedirectResponse(
         url="/",
@@ -482,7 +487,7 @@ async def show_form(request: Request, owner_id : str):
 async def submit_form(
         owner_id: str,
         category: str = Form(...),
-        property_value: int = Form(...),
+        property_value: float = Form(...),
         longitude: float = Form(...),
         latitude: float = Form(...),
         city: str = Form(...),
@@ -490,7 +495,7 @@ async def submit_form(
         description: str = Form(...)
 ):
     created_time = datetime.now()
-    property_id=Property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
+    property_id = property_service.create_property(owner_id, category, property_value, longitude, latitude, city, digital_address, description)
  
   
     return RedirectResponse(

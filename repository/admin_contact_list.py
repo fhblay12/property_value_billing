@@ -1,7 +1,7 @@
 
 class Admin_contact_list_repository:
 
-        def __init__(self, db, Admin_property_list_repository):
+        def __init__(self, db):
             self.db = db
 
         def get_contact_query(self, search: str | None,):

@@ -1,19 +1,30 @@
 import os
 import mysql.connector
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
 
 class Database:
     def __init__(self):
-        self.conn = mysql.connector.connect(
-            host=os.getenv("MYSQL_HOST"),
-            user=os.getenv("MYSQL_USER"),
-            password=os.getenv("MYSQL_PASSWORD"),
-            database=os.getenv("MYSQL_DATABASE")
-        )
-
+        retries = 5
+        for i in range(retries):
+            try:
+                self.conn = mysql.connector.connect(
+                    host=os.getenv("MYSQL_HOST"),
+                    user=os.getenv("MYSQL_USER"),
+                    password=os.getenv("MYSQL_PASSWORD"),
+                    database=os.getenv("MYSQL_DATABASE")
+                )
+                break
+            except mysql.connector.errors.DatabaseError as e:
+                if i < retries - 1:
+                    print(f"Database not ready, retrying in 5 seconds... ({i+1}/{retries})")
+                    time.sleep(5)
+                else:
+                    raise e
+                
     def execute(self, query, params=None, fetchone=False, fetchall=False):
         cursor = self.conn.cursor(buffered=True)
         cursor.execute(query, params or ())
